@@ -977,6 +977,10 @@ class EHSpiderParser {
 
   static String githubReleasePage2LatestVersion(Headers headers, dynamic data) {
     List releases = data;
+    if (releases.isEmpty) {
+      // a repository without releases yet: nothing to update to
+      throw const FormatException('No release published yet');
+    }
     Map latestRelease = releases[0];
     return latestRelease['tag_name'];
   }
