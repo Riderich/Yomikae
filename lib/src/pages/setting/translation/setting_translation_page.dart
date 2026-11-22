@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../../service/image_translation_service.dart';
+import '../../../service/on_device_translation/llm_page_translator.dart';
+import '../../../service/on_device_translation/on_device_translation_service.dart';
 import '../../../service/translation_runtime_service.dart';
 import '../../../setting/translation_setting.dart';
 import '../../../utils/toast_util.dart';
@@ -26,6 +28,10 @@ class _SettingTranslationPageState extends State<SettingTranslationPage> {
   bool testing = false;
   late String translationProvider;
   late bool disableThinking;
+  late String engine;
+  late String modelSource;
+
+  bool get onDevice => TranslationSetting.supportsOnDevice && engine == TranslationEngine.onDevice;
 
   @override
   void initState() {
@@ -45,6 +51,11 @@ class _SettingTranslationPageState extends State<SettingTranslationPage> {
         TextEditingController(text: translationSetting.apiModel.value);
     translationProvider = translationSetting.translationProvider.value;
     disableThinking = translationSetting.disableThinking.value;
+    engine = translationSetting.engine.value;
+    modelSource = translationSetting.modelSource.value;
+    if (onDevice) {
+      translationProvider = 'openai_compatible';
+    }
     sourceLanguageController = TextEditingController(
       text: translationSetting.sourceLanguage.value,
     );
@@ -81,6 +92,8 @@ class _SettingTranslationPageState extends State<SettingTranslationPage> {
       sourceLanguage: sourceLanguageController.text,
       targetLanguage: targetLanguageController.text,
       requestTimeoutSeconds: int.tryParse(timeoutController.text) ?? 300,
+      engine: engine,
+      modelSource: modelSource,
     );
     toast('saveSuccess'.tr);
   }
@@ -88,15 +101,125 @@ class _SettingTranslationPageState extends State<SettingTranslationPage> {
   Future<void> testConnection() async {
     await save();
     setState(() => testing = true);
-    final bool success = await imageTranslationService.testConnection();
+    final bool success = onDevice ? await _testLlm() : await imageTranslationService.testConnection();
     if (mounted) {
       setState(() => testing = false);
+    }
+    if (onDevice) {
+      toast(success ? 'translationLlmConnected'.tr : 'translationLlmUnavailable'.tr, isShort: false);
+      return;
     }
     toast(
       success
           ? 'translationServiceConnected'.tr
           : 'translationServiceUnavailable'.tr,
       isShort: false,
+    );
+  }
+
+  Future<bool> _testLlm() async {
+    try {
+      await LlmPageTranslator(
+        baseUrl: translationSetting.apiBaseUrl.value,
+        apiKey: translationSetting.apiKey.value,
+        model: translationSetting.apiModel.value,
+        disableThinking: translationSetting.disableThinking.value,
+        timeout: const Duration(seconds: 30),
+      ).ping();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Widget _buildEngineSelector() {
+    return SegmentedButton<String>(
+      segments: [
+        ButtonSegment(value: TranslationEngine.onDevice, label: Text('translationEngineOnDevice'.tr), icon: const Icon(Icons.phone_android)),
+        ButtonSegment(value: TranslationEngine.server, label: Text('translationEngineServer'.tr), icon: const Icon(Icons.dns_outlined)),
+      ],
+      selected: {engine},
+      onSelectionChanged: (selection) => setState(() {
+        engine = selection.first;
+        if (onDevice) {
+          translationProvider = 'openai_compatible';
+        }
+      }),
+    );
+  }
+
+  Widget _buildModelCard(BuildContext context) {
+    return GetBuilder<OnDeviceTranslationService>(
+      id: OnDeviceTranslationService.modelsUpdateId,
+      builder: (service) {
+        final OcrModelStatus status = service.modelStatus;
+        final String message = switch (status) {
+          OcrModelStatus.installed => 'translationModelsInstalled'.tr,
+          OcrModelStatus.downloading => 'translationModelsDownloading'.tr,
+          OcrModelStatus.error => 'translationModelsError'.trParams({'error': service.modelError ?? ''}),
+          OcrModelStatus.missing => 'translationModelsMissing'.tr,
+        };
+        return Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Icon(status == OcrModelStatus.installed
+                        ? Icons.check_circle
+                        : status == OcrModelStatus.error
+                            ? Icons.error_outline
+                            : Icons.downloading_outlined),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text('translationModelsTitle'.tr, style: Theme.of(context).textTheme.titleMedium)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(message),
+                if (status == OcrModelStatus.downloading) ...[
+                  const SizedBox(height: 12),
+                  LinearProgressIndicator(value: service.downloadProgress > 0 ? service.downloadProgress : null),
+                  const SizedBox(height: 6),
+                  Text('${(service.downloadProgress * 100).toStringAsFixed(0)}%'),
+                ],
+                const SizedBox(height: 12),
+                if (status == OcrModelStatus.downloading)
+                  OutlinedButton.icon(onPressed: service.cancelDownload, icon: const Icon(Icons.close), label: Text('cancel'.tr))
+                else if (status == OcrModelStatus.installed)
+                  TextButton.icon(onPressed: service.deleteModels, icon: const Icon(Icons.delete_outline), label: Text('deleteTranslationModels'.tr))
+                else ...[
+                  DropdownButtonFormField<String>(
+                    initialValue: modelSource,
+                    decoration: InputDecoration(labelText: 'translationModelSource'.tr, border: const OutlineInputBorder()),
+                    items: [
+                      DropdownMenuItem(value: TranslationModelSource.huggingFace, child: Text('translationModelSourceHuggingFace'.tr)),
+                      DropdownMenuItem(value: TranslationModelSource.hfMirror, child: Text('translationModelSourceMirror'.tr)),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => modelSource = value);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: () async {
+                      translationSetting.modelSource.value = modelSource;
+                      await translationSetting.saveBeanConfig();
+                      await service.downloadModels();
+                    },
+                    icon: const Icon(Icons.download),
+                    label: Text('downloadTranslationModels'.tr),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -108,8 +231,16 @@ class _SettingTranslationPageState extends State<SettingTranslationPage> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            Text('translationServiceHint'.tr),
+            if (TranslationSetting.supportsOnDevice) ...[
+              _buildEngineSelector(),
+              const SizedBox(height: 16),
+            ],
+            Text(onDevice ? 'onDeviceTranslationHint'.tr : 'translationServiceHint'.tr),
             const SizedBox(height: 20),
+            if (onDevice) ...[
+              _buildModelCard(context),
+              const SizedBox(height: 20),
+            ],
             if (GetPlatform.isWindows) ...[
               GetBuilder<TranslationRuntimeService>(
                 init: translationRuntimeService,
@@ -190,6 +321,7 @@ class _SettingTranslationPageState extends State<SettingTranslationPage> {
               ),
               const SizedBox(height: 20),
             ],
+            if (!onDevice) ...[
             TextField(
               controller: serviceUrlController,
               decoration: InputDecoration(
@@ -233,6 +365,7 @@ class _SettingTranslationPageState extends State<SettingTranslationPage> {
                 }
               },
             ),
+            ],
             if (translationProvider == 'openai_compatible') ...[
               const SizedBox(height: 16),
               TextField(

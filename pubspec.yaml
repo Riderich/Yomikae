@@ -2,7 +2,7 @@ name: jhentai
 description: A flutter app for E-Hentai/EXHentai
 
 publish_to: 'none'
-version: 8.0.14+328
+version: 8.1.1+330
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -119,6 +119,9 @@ dependencies:
   integral_isolates: 0.4.1
   screen_brightness: 0.2.2+1
   crypto: 3.0.3
+  # on-device manga translation (PP-OCR via ONNX Runtime, runs in a background isolate over FFI)
+  onnxruntime_v2: 1.23.2+2
+  ffi: ^2.1.0
   csv: 5.1.1
   dotted_border: 2.1.0
   j_downloader:
@@ -173,3 +176,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    # PP-OCRv6 recognition dictionary (Apache-2.0, PaddleOCR)
+    - assets/translation/ppocrv6_dict.txt

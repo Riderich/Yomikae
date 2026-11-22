@@ -18,6 +18,7 @@ import 'package:jhentai/src/service/frame_rate_service.dart';
 import 'package:jhentai/src/service/gallery_download/gallery_download_service.dart';
 import 'package:jhentai/src/service/history_service.dart';
 import 'package:jhentai/src/service/image_translation_service.dart';
+import 'package:jhentai/src/service/on_device_translation/on_device_translation_service.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
 import 'package:jhentai/src/service/jh_service.dart';
 import 'package:jhentai/src/service/local_block_rule_service.dart';
@@ -70,6 +71,7 @@ List<JHLifeCircleBean> lifeCircleBeans = [
   frameRateService,
   historyService,
   imageTranslationService,
+  onDeviceTranslationService,
   isolateService,
   localBlockRuleService,
   localConfigService,

@@ -2,11 +2,27 @@ import 'dart:convert';
 
 import 'package:get/get.dart';
 
+
 import '../enum/config_enum.dart';
 import '../service/jh_service.dart';
 import '../service/log.dart';
 
 TranslationSetting translationSetting = TranslationSetting();
+
+/// Where pages are translated.
+class TranslationEngine {
+  /// Text detection and OCR run on this device; only the text goes to the LLM API.
+  static const String onDevice = 'onDevice';
+
+  /// The page image is sent to a translation service (manga-image-translator adapter).
+  static const String server = 'server';
+}
+
+/// Where the on-device OCR models are downloaded from.
+class TranslationModelSource {
+  static const String huggingFace = 'huggingface';
+  static const String hfMirror = 'hf-mirror';
+}
 
 class TranslationSetting
     with JHLifeCircleBeanWithConfigStorage
@@ -21,6 +37,14 @@ class TranslationSetting
   RxString sourceLanguage = 'auto'.obs;
   RxString targetLanguage = 'zh-CN'.obs;
   RxInt requestTimeoutSeconds = 300.obs;
+  RxString engine = (supportsOnDevice ? TranslationEngine.onDevice : TranslationEngine.server).obs;
+  RxString modelSource = TranslationModelSource.huggingFace.obs;
+
+  /// On-device OCR is only shipped for Android for now: the ONNX Runtime that
+  /// onnxruntime_v2 bundles for Windows is too old for the PP-OCRv6 models.
+  static bool get supportsOnDevice => GetPlatform.isAndroid;
+
+  bool get isOnDevice => supportsOnDevice && engine.value == TranslationEngine.onDevice;
 
   @override
   ConfigEnum get configEnum => ConfigEnum.translationSetting;
@@ -42,6 +66,8 @@ class TranslationSetting
     targetLanguage.value = map['targetLanguage'] ?? targetLanguage.value;
     requestTimeoutSeconds.value =
         map['requestTimeoutSeconds'] ?? requestTimeoutSeconds.value;
+    engine.value = map['engine'] ?? engine.value;
+    modelSource.value = map['modelSource'] ?? modelSource.value;
   }
 
   @override
@@ -57,6 +83,8 @@ class TranslationSetting
       'sourceLanguage': sourceLanguage.value,
       'targetLanguage': targetLanguage.value,
       'requestTimeoutSeconds': requestTimeoutSeconds.value,
+      'engine': engine.value,
+      'modelSource': modelSource.value,
     });
   }
 
@@ -77,7 +105,11 @@ class TranslationSetting
     required String sourceLanguage,
     required String targetLanguage,
     required int requestTimeoutSeconds,
+    String? engine,
+    String? modelSource,
   }) async {
+    this.engine.value = engine ?? this.engine.value;
+    this.modelSource.value = modelSource ?? this.modelSource.value;
     this.serviceUrl.value = _normalizeServiceUrl(serviceUrl);
     this.apiToken.value = apiToken.trim();
     this.translationProvider.value = translationProvider;

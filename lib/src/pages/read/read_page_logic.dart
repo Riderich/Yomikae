@@ -899,8 +899,11 @@ class ReadPageLogic extends GetxController
     try {
       state.showTranslatedImages = true;
       updateSafely([topMenuId]);
-      await _translatePage(index);
-      toast('translationCompleted'.tr);
+      final ImageTranslationTiming? timing = await _translatePage(index);
+      toast(
+        timing == null ? 'translationCompleted'.tr : '${'translationCompleted'.tr}\n${timing.summary()}',
+        isShort: timing == null,
+      );
     } catch (e) {
       toast('${'translationFailed'.tr}: $e', isShort: false);
     } finally {
@@ -995,6 +998,7 @@ class ReadPageLogic extends GetxController
     updateSafely([topMenuId]);
 
     int failed = 0;
+    final List<ImageTranslationTiming> timings = [];
     try {
       for (int index = fromIndex; index <= toIndex; index++) {
         if (_stopTranslationRangeRequested) {
@@ -1004,7 +1008,10 @@ class ReadPageLogic extends GetxController
             imageTranslationService.entry(state.readPageInfo, index);
         if (entry.status != ImageTranslationStatus.success) {
           try {
-            await _translatePage(index);
+            final ImageTranslationTiming? timing = await _translatePage(index);
+            if (timing != null) {
+              timings.add(timing);
+            }
           } catch (e, stack) {
             failed++;
             log.error(
@@ -1022,12 +1029,16 @@ class ReadPageLogic extends GetxController
       layoutLogic.updateSafely([BaseLayoutLogic.pageId]);
       final String resultKey =
           stopped ? 'translationRangeStopped' : 'translationRangeCompleted';
+      final ImageTranslationTiming? averageTiming = ImageTranslationTiming.average(timings);
+      final String result = resultKey.trParams({
+        'completed': '$_translationRangeCompleted',
+        'total': '$_translationRangeTotal',
+        'failed': '$failed',
+      });
       toast(
-          resultKey.trParams({
-            'completed': '$_translationRangeCompleted',
-            'total': '$_translationRangeTotal',
-            'failed': '$failed',
-          }),
+          averageTiming == null
+              ? result
+              : '$result\n${'translationTimingAveragePerPage'.tr} ${averageTiming.summary()}',
           isShort: false);
     }
   }
@@ -1037,7 +1048,8 @@ class ReadPageLogic extends GetxController
     updateSafely([topMenuId]);
   }
 
-  Future<void> _translatePage(int index) async {
+  Future<ImageTranslationTiming?> _translatePage(int index) async {
+    final Stopwatch fetchStopwatch = Stopwatch()..start();
     GalleryImage? image = state.images[index];
     if (image == null && state.readPageInfo.mode == ReadMode.online) {
       if (state.thumbnails[index] == null) {
@@ -1071,11 +1083,13 @@ class ReadPageLogic extends GetxController
     if (bytes == null || bytes.isEmpty) {
       throw StateError('Unable to read image bytes');
     }
-    await imageTranslationService.translate(
+    fetchStopwatch.stop();
+    return imageTranslationService.translate(
       info: state.readPageInfo,
       index: index,
       imageBytes: bytes,
       fileName: fileName,
+      fetchSourceDuration: fetchStopwatch.elapsed,
     );
   }
 
