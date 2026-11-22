@@ -9,6 +9,7 @@ import 'package:jhentai/src/pages/details/details_page_logic.dart';
 import 'package:jhentai/src/pages/gallery_image/gallery_image_page_logic.dart';
 import 'package:jhentai/src/pages/layout/desktop/desktop_layout_page.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2.dart';
+import 'package:jhentai/src/pages/modern/modern_layout_page.dart';
 import 'package:jhentai/src/pages/layout/tablet_v2/tablet_layout_page_v2.dart';
 import 'package:jhentai/src/setting/style_setting.dart';
 import 'package:jhentai/src/setting/user_setting.dart';
@@ -74,14 +75,14 @@ class _HomePageState extends State<HomePage> with LoginRequiredMixin, WindowList
           () {
             if (styleSetting.layout.value == LayoutMode.mobileV2 || styleSetting.layout.value == LayoutMode.mobile) {
               styleSetting.actualLayout = LayoutMode.mobileV2;
-              return MobileLayoutPageV2();
+              return styleSetting.modernNavigation.isTrue ? const ModernLayoutPage() : MobileLayoutPageV2();
             }
 
             /// Device width is under 600, degrade to mobileV2 layout.
             if (fullScreenWidth < 600) {
               styleSetting.actualLayout = LayoutMode.mobileV2;
               untilRoute2BlankPage();
-              return MobileLayoutPageV2();
+              return styleSetting.modernNavigation.isTrue ? const ModernLayoutPage() : MobileLayoutPageV2();
             }
 
             if (styleSetting.layout.value == LayoutMode.tabletV2 || styleSetting.layout.value == LayoutMode.tablet) {

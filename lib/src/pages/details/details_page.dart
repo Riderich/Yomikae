@@ -8,7 +8,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
-import 'package:jhentai/src/service/quick_search_service.dart';
+import 'package:jhentai/src/service/follow_service.dart';
 import 'package:jhentai/src/enum/eh_namespace.dart';
 import 'package:jhentai/src/extension/string_extension.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
@@ -457,7 +457,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
               );
               toolbar.buttonItems?.add(
                 ContextMenuButtonItem(
-                  label: quickSearchService.isFavoriteUploader(logic.uploader) ? 'unFavoriteUploader'.tr : 'favoriteUploader'.tr,
+                  label: followService.isFollowing('uploader', logic.uploader) ? 'unfollowUploader'.tr : 'followUploader'.tr,
                   onPressed: () {
                     ContextMenuController.removeAny();
                     logic.toggleFavoriteUploader();
@@ -478,11 +478,12 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
           mainAxisSize: MainAxisSize.min,
           children: [
             Flexible(child: uploaderText),
-            GetBuilder<QuickSearchService>(
+            GetBuilder<FollowService>(
+              id: FollowService.entriesId,
               builder: (_) {
-                bool favorited = quickSearchService.isFavoriteUploader(logic.uploader);
+                bool favorited = followService.isFollowing('uploader', logic.uploader);
                 return Tooltip(
-                  message: favorited ? 'unFavoriteUploader'.tr : 'favoriteUploader'.tr,
+                  message: favorited ? 'unfollowUploader'.tr : 'followUploader'.tr,
                   child: InkWell(
                     customBorder: const CircleBorder(),
                     onTap: logic.toggleFavoriteUploader,
@@ -1203,7 +1204,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
               height: 1,
             ),
           ),
-          onPressed: disabled ? null : logic.searchSimilar,
+          onPressed: disabled ? null : () => logic.showSimilarOptions(context),
         );
       },
     );

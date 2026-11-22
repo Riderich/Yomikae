@@ -25,6 +25,7 @@ import '../database/database.dart';
 import '../model/gallery_tag.dart';
 import '../network/eh_request.dart';
 import '../setting/user_setting.dart';
+import '../service/follow_service.dart';
 import '../service/log.dart';
 import '../utils/snack_util.dart';
 import '../utils/string_uril.dart';
@@ -96,6 +97,7 @@ class _EHTagDialogState extends State<EHTagDialog> with LoginRequiredMixin {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
+            _buildFollowButton(),
             _buildVoteUpButton(),
             _buildVoteDownButton(),
             _buildWatchTagButton(),
@@ -139,6 +141,22 @@ class _EHTagDialogState extends State<EHTagDialog> with LoginRequiredMixin {
           },
         ).paddingSymmetric(horizontal: 12),
       ),
+    );
+  }
+
+  /// Follow in the app (see the follow tab), independent of EH's watched tags.
+  Widget _buildFollowButton() {
+    return LikeButton(
+      isLiked: followService.isFollowing(widget.tagData.namespace, widget.tagData.key),
+      likeBuilder: (bool liked) => Icon(
+        liked ? Icons.star : Icons.star_border,
+        size: UIConfig.tagDialogButtonSize + 2,
+        color: liked ? Colors.amber : UIConfig.tagDialogButtonColor(context),
+      ),
+      onTap: (bool liked) async {
+        await followService.toggle(widget.tagData.namespace, widget.tagData.key, label: widget.tagData.tagName);
+        return !liked;
+      },
     );
   }
 

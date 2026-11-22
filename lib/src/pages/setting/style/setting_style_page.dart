@@ -29,6 +29,7 @@ class SettingStylePage extends StatelessWidget {
             _buildCrossAxisCountInDetailPage(),
             if (!styleSetting.isInWaterFlowListMode) _buildMoveCover2RightSide().fadeIn(),
             _buildLayout(context),
+            if (styleSetting.isInMobileLayout) _buildModernNavigation(),
           ],
         ).withListTileTheme(context),
       ),
@@ -175,6 +176,15 @@ class SettingStylePage extends StatelessWidget {
       subtitle: Text('needRestart'.tr),
       value: styleSetting.moveCover2RightSide.value,
       onChanged: styleSetting.saveMoveCover2RightSide,
+    );
+  }
+
+  Widget _buildModernNavigation() {
+    return SwitchListTile(
+      title: Text('modernNavigation'.tr),
+      subtitle: Text('modernNavigationHint'.tr),
+      value: styleSetting.modernNavigation.value,
+      onChanged: styleSetting.saveModernNavigation,
     );
   }
 

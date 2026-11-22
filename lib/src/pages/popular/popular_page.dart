@@ -12,6 +12,7 @@ class PopularPage extends BasePage {
     bool showMenuButton = false,
     bool showTitle = false,
     String? name,
+    bool embedded = false,
   }) : super(
           key: key,
           showMenuButton: showMenuButton,
@@ -19,6 +20,7 @@ class PopularPage extends BasePage {
           showJumpButton: false,
           showScroll2TopButton: true,
           name: name,
+          embedded: embedded,
         );
 
   @override

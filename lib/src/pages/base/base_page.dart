@@ -24,6 +24,9 @@ abstract class BasePage<L extends BasePageLogic, S extends BasePageState> extend
   final bool showTitle;
   final String? name;
 
+  /// Shown inside another page (the modern layout's bookshelf), which provides the app bar.
+  final bool embedded;
+
   const BasePage({
     Key? key,
     this.showMenuButton = false,
@@ -32,6 +35,7 @@ abstract class BasePage<L extends BasePageLogic, S extends BasePageState> extend
     this.showScroll2TopButton = false,
     this.showTitle = false,
     this.name,
+    this.embedded = false,
   }) : super(key: key);
 
   L get logic;
@@ -51,7 +55,7 @@ abstract class BasePage<L extends BasePageLogic, S extends BasePageState> extend
       init: logic,
       builder: (_) => Scaffold(
         backgroundColor: UIConfig.backGroundColor(context),
-        appBar: showFilterButton || showJumpButton || showMenuButton || showTitle ? buildAppBar(context) : null,
+        appBar: !embedded && (showFilterButton || showJumpButton || showMenuButton || showTitle) ? buildAppBar(context) : null,
         body: SafeArea(child: buildBody(context)),
         floatingActionButton: showScroll2TopButton ? buildFloatingActionButton() : null,
       ),

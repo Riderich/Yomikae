@@ -12,6 +12,7 @@ class WatchedPage extends BasePage {
     bool showMenuButton = false,
     bool showTitle = false,
     String? name,
+    bool embedded = false,
   }) : super(
           key: key,
           showMenuButton: showMenuButton,
@@ -20,6 +21,7 @@ class WatchedPage extends BasePage {
           showTitle: showTitle,
           showScroll2TopButton: true,
           name: name,
+          embedded: embedded,
         );
 
   @override

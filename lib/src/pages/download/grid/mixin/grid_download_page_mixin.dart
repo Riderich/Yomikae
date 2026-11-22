@@ -46,7 +46,7 @@ mixin GridBasePage on StatelessWidget implements Scroll2TopPageMixin {
   AppBar buildAppBar(BuildContext context) {
     return AppBar(
       centerTitle: true,
-      leading: styleSetting.isInV2Layout
+      leading: styleSetting.isInV2Layout && (!styleSetting.isInModernLayout || isRouteAtTop(Routes.download))
           ? IconButton(
               icon: isRouteAtTop(Routes.download) ? const Icon(Icons.arrow_back) : Icon(Icons.menu, size: 20),
               onPressed: () {

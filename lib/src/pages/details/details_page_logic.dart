@@ -62,7 +62,9 @@ import '../../service/history_service.dart';
 import '../../service/gallery_download/download_path_resolver.dart';
 import '../../service/gallery_download/gallery_download_service.dart';
 import '../../service/local_block_rule_service.dart';
-import '../../service/quick_search_service.dart';
+import '../../service/follow_service.dart';
+import '../../service/tag_search_order_service.dart';
+import '../../service/taste_service.dart';
 import '../../service/storage_service.dart';
 import '../../setting/eh_setting.dart';
 import '../../setting/read_setting.dart';
@@ -764,6 +766,84 @@ class DetailsPageLogic extends GetxController with LoginRequiredMixin, Scroll2To
     toast(result, isShort: false);
   }
 
+  /// Galleries like this one: same title, same artist / circle / uploader, or
+  /// the same rarest content tags (the ones that make this gallery distinctive).
+  Future<void> showSimilarOptions(BuildContext context) async {
+    final LinkedHashMap<String, List<GalleryTag>> tags = state.galleryDetails?.tags ?? state.galleryMetadata?.tags ?? state.gallery?.tags ?? LinkedHashMap();
+    String label(GalleryTag tag) => tag.tagData.tagName?.isNotEmpty == true ? tag.tagData.tagName! : tag.tagData.key;
+    String keyword(GalleryTag tag) => '${tag.tagData.namespace}:"${tag.tagData.key}\$"';
+
+    final List<GalleryTag> content = [
+      for (String namespace in ['female', 'male', 'mixed', 'other']) ...?tags[namespace],
+    ].where((t) => !TasteService.isUninformative('${t.tagData.namespace}:${t.tagData.key}')).toList();
+    List<GalleryTag> distinctive = [];
+    if (content.isNotEmpty) {
+      final Map<String, int> counts = {};
+      try {
+        for (TagCountData c in await tagSearchOrderOptimizationService.batchSelectTagCount(content.map((t) => '${t.tagData.namespace}:${t.tagData.key}').toList())) {
+          counts[c.namespaceWithKey] = c.count;
+        }
+      } catch (_) {}
+      int count(GalleryTag t) => counts['${t.tagData.namespace}:${t.tagData.key}'] ?? 1 << 30;
+      // rarest first, but not so rare that only this gallery matches; without
+      // count data keep the gallery's own order
+      distinctive = List.of(content)..sort((a, b) => count(a).compareTo(count(b)));
+      final List<GalleryTag> common = distinctive.where((t) => count(t) >= 1000).toList();
+      distinctive = (common.length >= 2 ? common : distinctive).take(2).toList();
+    }
+
+    if (!context.mounted) {
+      return;
+    }
+    final String? uploaderName = uploader.isEmpty ? null : uploader;
+    await showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        void go(String keyword) {
+          Navigator.of(sheetContext).pop();
+          newSearch(keyword: keyword, forceNewRoute: true);
+        }
+
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              if (mainTitleText.isNotEmpty)
+                ListTile(
+                  leading: const Icon(Icons.title),
+                  title: Text('similarTitle'.tr),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    searchSimilar();
+                  },
+                ),
+              for (GalleryTag tag in [...?tags['artist'], ...?tags['group']])
+                ListTile(
+                  leading: Icon(tag.tagData.namespace == 'artist' ? Icons.brush_outlined : Icons.groups_outlined),
+                  title: Text('${tag.tagData.namespace.tr}: ${label(tag)}'),
+                  onTap: () => go(keyword(tag)),
+                ),
+              if (uploaderName != null)
+                ListTile(
+                  leading: const Icon(Icons.person_outline),
+                  title: Text('${'uploader'.tr}: $uploaderName'),
+                  onTap: () => go('uploader:"$uploaderName"'),
+                ),
+              if (distinctive.isNotEmpty)
+                ListTile(
+                  leading: const Icon(Icons.auto_awesome_outlined),
+                  title: Text('similarTags'.tr),
+                  subtitle: Text(distinctive.map(label).join(' · ')),
+                  onTap: () => go(distinctive.map(keyword).join(' ')),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void searchSimilar() {
     if (mainTitleText.isEmpty) {
       return;
@@ -994,7 +1074,7 @@ class DetailsPageLogic extends GetxController with LoginRequiredMixin, Scroll2To
     if (uploader.isEmpty) {
       return;
     }
-    await quickSearchService.toggleFavoriteUploader(uploader);
+    await followService.toggle('uploader', uploader);
   }
 
   Future<void> blockTitle(String title) async {

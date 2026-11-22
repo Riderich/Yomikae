@@ -23,6 +23,9 @@ class StyleSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircl
   RxnInt crossAxisCountInDetailPage = RxnInt(null);
   RxMap<String, ListMode> pageListMode = <String, ListMode>{}.obs;
   RxBool moveCover2RightSide = false.obs;
+
+  /// Phone layout with a 4-tab bottom bar (discover / find / follow / bookshelf) instead of the drawer.
+  RxBool modernNavigation = true.obs;
   Rx<LayoutMode> layout = PlatformDispatcher.instance.views.first.physicalSize.width / PlatformDispatcher.instance.views.first.devicePixelRatio < 600
       ? LayoutMode.mobileV2.obs
       : GetPlatform.isDesktop
@@ -55,6 +58,8 @@ class StyleSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircl
 
   bool get isInDesktopLayout => actualLayout == LayoutMode.desktop;
 
+  bool get isInModernLayout => isInMobileLayout && modernNavigation.isTrue;
+
   @override
   ConfigEnum get configEnum => ConfigEnum.styleSetting;
 
@@ -72,6 +77,7 @@ class StyleSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircl
     crossAxisCountInDetailPage.value = map['crossAxisCountInDetailPage'];
     pageListMode.value = Map.from(map['pageListMode']?.map((route, listModeIndex) => MapEntry(route, ListMode.values[listModeIndex])) ?? {});
     moveCover2RightSide.value = map['moveCover2RightSide'] ?? moveCover2RightSide.value;
+    modernNavigation.value = map['modernNavigation'] ?? modernNavigation.value;
     layout.value = LayoutMode.values[map['layout'] ?? layout.value.index];
 
     /// old layout has been removed in v5.0.0
@@ -98,6 +104,7 @@ class StyleSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircl
       'crossAxisCountInDetailPage': crossAxisCountInDetailPage.value,
       'pageListMode': pageListMode.map((route, listMode) => MapEntry(route, listMode.index)),
       'moveCover2RightSide': moveCover2RightSide.value,
+      'modernNavigation': modernNavigation.value,
       'layout': layout.value.index,
     });
   }
@@ -167,6 +174,12 @@ class StyleSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircl
     } else {
       this.pageListMode[routeName] = listMode;
     }
+    await saveBeanConfig();
+  }
+
+  Future<void> saveModernNavigation(bool value) async {
+    log.debug('saveModernNavigation:$value');
+    modernNavigation.value = value;
     await saveBeanConfig();
   }
 

@@ -11,6 +11,7 @@ class FavoritePage extends BasePage {
     bool showMenuButton = false,
     bool showTitle = false,
     String? name,
+    bool embedded = false,
   }) : super(
           key: key,
           showMenuButton: showMenuButton,
@@ -19,6 +20,7 @@ class FavoritePage extends BasePage {
           showScroll2TopButton: true,
           showTitle: showTitle,
           name: name,
+          embedded: embedded,
         );
 
   @override
