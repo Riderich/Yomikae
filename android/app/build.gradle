@@ -46,7 +46,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.riderich.jhentai.translation"
+        applicationId "com.riderich.yomikae"
         minSdkVersion 24
         targetSdkVersion 36
         versionCode flutterVersionCode.toInteger()

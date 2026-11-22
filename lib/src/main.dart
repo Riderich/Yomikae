@@ -139,7 +139,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget app = GetMaterialApp(
-      title: 'JHenTai',
+      title: 'Yomikae',
       themeMode: styleSetting.themeMode.value,
       theme: ThemeConfig.theme(styleSetting.lightThemeColor.value, Brightness.light),
       darkTheme: ThemeConfig.theme(styleSetting.darkThemeColor.value, Brightness.dark),

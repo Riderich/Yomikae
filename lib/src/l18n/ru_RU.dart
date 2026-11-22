@@ -193,8 +193,8 @@ class ru_RU {
       'hasDownloaded': 'Уже загружено',
       '410Hints': 'Вы скачали слишком много байт из этого архива, и требуется повторная разблокировка для возобновления.',
       '429Hints': 'Слишком много запросов на загрузку! Вам лучше уменьшить количество одновременных загрузок архивов.',
-      'getUnpackedImagesFailedMsg': 'JHenTai не может загрузить изображения этого архива, пожалуйста, проверьте локальный файл.',
-      // Оставляем JHenTai
+      'getUnpackedImagesFailedMsg': 'Yomikae не может загрузить изображения этого архива, пожалуйста, проверьте локальный файл.',
+      // Оставляем Yomikae
       'getGalleryTorrentsFailed': 'Не удалось получить торренты',
       'chooseArchive': 'Выбрать архив',
       'tagSetExceedLimit': 'Нельзя добавить больше тегов, так как вы достигли лимита',
@@ -226,7 +226,7 @@ class ru_RU {
       'voteCommentFailedHint': 'Попробуйте сначала потянуть вниз для обновления страницы деталей',
       'unknownUser': 'Неизвестный пользователь',
       'atLeast3Characters': 'Минимум 3 символа',
-      'noJHenTaiHints': 'Пожалуйста, не упоминайте JHenTai, спасибо',
+      'noJHenTaiHints': 'Пожалуйста, не упоминайте Yomikae, спасибо',
       'blockUser': 'Заблокировать пользователя',
 
       /// EHImage
@@ -241,8 +241,8 @@ class ru_RU {
       'paused': 'На паузе',
       'exceedImageLimits': "Превышен лимит изображений",
       'ehServerError': 'Произошла ошибка на сервере EH, попробуйте позже',
-      'unsupportedImagePageStyle': "JHenTai не поддерживает Multi-Page Viewer(MPV), пожалуйста, измените стиль на стандартный на e-hentai.org",
-      // Оставляем JHenTai, MPV, e-hentai.org
+      'unsupportedImagePageStyle': "Yomikae не поддерживает Multi-Page Viewer(MPV), пожалуйста, измените стиль на стандартный на e-hentai.org",
+      // Оставляем Yomikae, MPV, e-hentai.org
       'toNext': 'К следующей',
       'toPrev': 'К предыдущей',
       'back': 'Назад',
@@ -283,7 +283,7 @@ class ru_RU {
       'redirectAllGallery': 'Перенаправлять все галереи на EH',
       'imDonorHint': 'Если вы донор, вы можете включить это, чтобы получить доступ к галереям на сайте EX',
       'profileSetting': 'Настройка профиля',
-      'chooseProfileHint': 'Выберите профиль для использования в JHenTai',
+      'chooseProfileHint': 'Выберите профиль для использования в Yomikae',
       'siteSetting': 'Настройки сайта',
       'siteSettingHint': 'Редактировать настройки сайта на e-hentai',
       'showCookie': 'Показать Cookie',
@@ -450,8 +450,8 @@ class ru_RU {
       'deleteSuperResolvedImage': 'Удалить обработанное изображение',
       'superResolveOriginalImageHint': 'Обработка оригинального изображения требует больше времени, места и ресурсов. Продолжить?',
       'verityAppLinks4Android12': 'Проверка ссылок приложений (Android 12+)',
-      'verityAppLinks4Android12Hint': 'Для Android 12+ нужно вручную добавить ссылки в проверенные, чтобы открывать JHenTai из сторонних приложений',
-      // Оставляем JHenTai
+      'verityAppLinks4Android12Hint': 'Для Android 12+ нужно вручную добавить ссылки в проверенные, чтобы открывать Yomikae из сторонних приложений',
+      // Оставляем Yomikae
       'noImageMode': 'Режим без изображений',
       'exportData': 'Экспорт данных',
       'exportDataHint': 'Экспорт настроек, правил блокировки и истории',
@@ -609,8 +609,8 @@ class ru_RU {
       'reUnlock': 'Разблокировать заново',
       'reUnlockHint': 'Внимание! Повторная разблокировка требует повторной покупки архива.',
       'downloadHelpInfo': 'Если вы не можете скачать и видите ошибки типа "table doesn\'t exist" в логах, удалите и переустановите приложение.',
-      'localGalleryHelpInfo': 'Загрузка галерей, скачанных не через JHenTai. Добавьте путь в Настройки загрузки -> Доп. путь сканирования, затем обновите.',
-      'localGalleryHelpInfo4iOSAndMacOS': 'Загрузка галерей, скачанных не через JHenTai. Поместите галереи в путь загрузки по умолчанию, затем обновите.',
+      'localGalleryHelpInfo': 'Загрузка галерей, скачанных не через Yomikae. Добавьте путь в Настройки загрузки -> Доп. путь сканирования, затем обновите.',
+      'localGalleryHelpInfo4iOSAndMacOS': 'Загрузка галерей, скачанных не через Yomikae. Поместите галереи в путь загрузки по умолчанию, затем обновите.',
       'deleteLocalGalleryHint': 'Удалить ваши локальные файлы',
       'priority': 'Приоритет',
       'highest': 'Высший',
@@ -804,8 +804,8 @@ class ru_RU {
       'parseFailed': 'Parse failed',
       'checkedIn': 'Already checked in today',
       'serverError': 'Archive bot internal error',
-      'useProxyServer': 'Use JHenTai Proxy Server',
-      'useProxyServerHint': 'Route requests through JHenTai server',
+      'useProxyServer': 'Use Yomikae Proxy Server',
+      'useProxyServerHint': 'Route requests through Yomikae server',
 
       /// password setting dialog
       'setPasswordHint': 'Пожалуйста, введите ваш пароль',

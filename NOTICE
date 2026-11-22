@@ -1,0 +1,25 @@
+Yomikae
+Copyright 2025-2026 Riderich and contributors
+
+This product is a modified version of JHenTai
+(https://github.com/jiangtian616/JHenTai), copyright jiangtian616 and its
+contributors, licensed under the Apache License, Version 2.0.
+
+Modifications made in Yomikae include, among others:
+- Rebranding (application name, package id, icons, links)
+- A new phone navigation (Discover / Find / Follow / Bookshelf), a tag
+  browser, following of uploaders, artists, circles and tags with new-gallery
+  counts, and a "taste" analysis of the user's favourites
+- Manga image translation: on-device text detection and recognition on
+  Android (ONNX Runtime) and a local translation service on Windows
+- Assorted fixes
+
+Files carried over from JHenTai keep their original copyright and license.
+"JHenTai" is the name of the original project; Yomikae is not affiliated with
+or endorsed by it.
+
+Third-party components used at runtime (downloaded on demand, not bundled):
+- PP-OCRv6 small detection model, PaddlePaddle, Apache License 2.0
+- PP-OCRv6 small recognition model fine-tuned for manga, fumetodev, Apache License 2.0
+- EhTagTranslation database, see https://github.com/EhTagTranslation/Database
+- e-hentai-tag-count data, see https://github.com/mokurin000/e-hentai-tag-count

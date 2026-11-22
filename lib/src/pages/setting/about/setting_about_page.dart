@@ -16,9 +16,9 @@ class _SettingAboutPageState extends State<SettingAboutPage> {
   String packageName = '';
   String version = '';
   String buildNumber = '';
-  String author = '酱天小禽兽(JTMonster)';
-  String telegram = 'https://t.me/+PindoE9yvIpmOWI9';
-  String gitRepo = 'https://github.com/jiangtian616/JHenTai';
+  String author = 'Riderich';
+  String upstream = 'https://github.com/jiangtian616/JHenTai';
+  String gitRepo = 'https://github.com/Riderich/Yomikae';
   String helpPage = 'https://github.com/jiangtian616/JHenTai/wiki';
 
   @override
@@ -37,7 +37,7 @@ class _SettingAboutPageState extends State<SettingAboutPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(centerTitle: true, title: const Text('JHenTai')),
+      appBar: AppBar(centerTitle: true, title: const Text('Yomikae')),
       body: ListView(
         padding: const EdgeInsets.only(top: 16),
         children: [
@@ -49,9 +49,9 @@ class _SettingAboutPageState extends State<SettingAboutPage> {
             onTap: () => launchUrlString(gitRepo, mode: LaunchMode.externalApplication),
           ),
           ListTile(
-            title: const Text('Telegram(Chinese Mainly)'),
-            subtitle: Text('telegramHint'.tr + '\n' + telegram),
-            onTap: () => launchUrlString(telegram, mode: LaunchMode.externalApplication),
+            title: Text('basedOnJHenTai'.tr),
+            subtitle: SelectableText(upstream),
+            onTap: () => launchUrlString(upstream, mode: LaunchMode.externalApplication),
           ),
           ListTile(
             title: Text('Q&A'.tr),

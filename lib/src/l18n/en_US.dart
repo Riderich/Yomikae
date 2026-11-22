@@ -44,7 +44,7 @@ class en_US {
       'imageTranslation': 'Image translation',
       'translationSettings': 'Translation settings',
       'translationServiceHint':
-          'JHenTai sends the current page to a local translation service. The service performs text detection, OCR, translation, inpainting, and typesetting, then returns a translated image.',
+          'Yomikae sends the current page to a local translation service. The service performs text detection, OCR, translation, inpainting, and typesetting, then returns a translated image.',
       'translationRuntimeTitle': 'Local translation runtime',
       'initializeTranslationRuntime': 'Initialize translation runtime',
       'startTranslationRuntime': 'Start translation service',
@@ -294,7 +294,7 @@ class en_US {
       '429Hints':
           'Too many download requests! You\'d better decrease your archive download concurrency.',
       'getUnpackedImagesFailedMsg':
-          'JHenTai can\'t load images of this archive, please check your local file.',
+          'Yomikae can\'t load images of this archive, please check your local file.',
       'getGalleryTorrentsFailed': 'Get torrents failed',
       'chooseArchive': 'Choose Archive',
       'tagSetExceedLimit':
@@ -327,7 +327,7 @@ class en_US {
       'voteCommentFailedHint': 'Try to pull-down to refresh details page first',
       'unknownUser': 'Unknown User',
       'atLeast3Characters': 'At least 3 characters',
-      'noJHenTaiHints': 'Please don\'t mention JHenTai, thanks',
+      'noJHenTaiHints': 'Please don\'t mention Yomikae, thanks',
       'blockUser': 'Block user',
 
       /// EHImage
@@ -344,7 +344,7 @@ class en_US {
       'ehServerError':
           'An error occurred due to EH\'s server, please try again later',
       'unsupportedImagePageStyle':
-          "JHenTai doesn't support Multi-Page Viewer(MPV), please change to default style in e-hentai.org",
+          "Yomikae doesn't support Multi-Page Viewer(MPV), please change to default style in e-hentai.org",
       'toNext': 'To next',
       'toPrev': 'To prev',
       'back': 'Back',
@@ -387,7 +387,7 @@ class en_US {
       'imDonorHint':
           'If you are a donor, you can turn this on to help you access galleries in EX site',
       'profileSetting': 'Profile Setting',
-      'chooseProfileHint': 'Choose profile used in JHenTai',
+      'chooseProfileHint': 'Choose profile used in Yomikae',
       'siteSetting': 'Site Setting',
       'siteSettingHint': 'Edit site setting in e-hentai',
       'showCookie': 'Cookie',
@@ -570,7 +570,7 @@ class en_US {
           'Process original image cost more time, space and performance, are you sure to continue?',
       'verityAppLinks4Android12': 'Verity App Links(Android 12+)',
       'verityAppLinks4Android12Hint':
-          'For Android 12+, you need to manually add link to verified links in order to open JHenTai in 3-rd apps',
+          'For Android 12+, you need to manually add link to verified links in order to open Yomikae in 3-rd apps',
       'noImageMode': 'No Image Mode',
       'exportData': 'Export Data',
       'exportDataHint': 'Export configs, block rules and history',
@@ -737,9 +737,9 @@ class en_US {
       'downloadHelpInfo':
           'If you can\'t download and find errors like table doesn\'t exist in logs, please uninstall current app and re-install.',
       'localGalleryHelpInfo':
-          'Load galleries which is not downloaded by JHenTai. Add config in Download Setting -> Extra Gallery Scan Path and then refresh.',
+          'Load galleries which is not downloaded by Yomikae. Add config in Download Setting -> Extra Gallery Scan Path and then refresh.',
       'localGalleryHelpInfo4iOSAndMacOS':
-          'Load galleries which is not downloaded by JHenTai. Put your galleries in default download path and then refresh',
+          'Load galleries which is not downloaded by Yomikae. Put your galleries in default download path and then refresh',
       'deleteLocalGalleryHint': 'Delete your local files',
       'priority': 'Priority',
       'highest': 'Highest',
@@ -950,8 +950,8 @@ class en_US {
       'parseFailed': 'Parse failed',
       'checkedIn': 'Already checked in today',
       'serverError': 'Archive bot internal error',
-      'useProxyServer': 'Use JHenTai Proxy Server',
-      'useProxyServerHint': 'Route requests through JHenTai server',
+      'useProxyServer': 'Use Yomikae Proxy Server',
+      'useProxyServerHint': 'Route requests through Yomikae server',
 
       /// password setting dialog
       'setPasswordHint': 'Please input your password',
@@ -1034,6 +1034,7 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'chooseTagSet': 'Choose Tag Set',
 
       /// modern layout
+      'basedOnJHenTai': 'Based on JHenTai by JTMonster (Apache-2.0)',
       'discover': 'Discover',
       'find': 'Find',
       'follow': 'Follow',

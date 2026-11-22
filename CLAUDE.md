@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-JHenTai is a Flutter app for browsing E-Hentai / EXHentai, targeting Android, iOS, Windows, macOS, and Linux. Version `8.0.14+328` (from pubspec.yaml).
+Yomikae (译读) is a Flutter app for browsing E-Hentai / EXHentai, derived from JHenTai (Apache-2.0, see NOTICE). It targets Android, iOS, Windows, macOS and Linux; the Dart package is still named `jhentai`. Version is in pubspec.yaml.
 
 ## Build & dev commands
 

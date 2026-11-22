@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: 下载最新正式版
-    url: https://github.com/Riderich/JHenTai-Image-Translation/releases/latest
+    url: https://github.com/Riderich/Yomikae/releases/latest
     about: 报告问题前请先升级并重试。
   - name: 上游 JHenTai
     url: https://github.com/jiangtian616/JHenTai

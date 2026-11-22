@@ -1,137 +1,93 @@
-# JHenTai Image Translation
+# Yomikae 译读
 
-> 在 JHenTai 阅读器中直接完成漫画文字检测、日文 OCR、机器翻译、原文擦除和中文嵌字。
+> 为中文读者做的 E-Hentai / ExHentai 阅读器：找本子、追作者和汉化组，日文漫画在手机上直接翻译成中文读。
 
-[![Windows](https://img.shields.io/badge/Windows-x64-0078D4?logo=windows)](https://github.com/Riderich/JHenTai-Image-Translation/releases)
-[![Release](https://img.shields.io/github/v/release/Riderich/JHenTai-Image-Translation)](https://github.com/Riderich/JHenTai-Image-Translation/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/Riderich/JHenTai-Image-Translation/total)](https://github.com/Riderich/JHenTai-Image-Translation/releases)
+[![Release](https://img.shields.io/github/v/release/Riderich/Yomikae)](https://github.com/Riderich/Yomikae/releases/latest)
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue)](LICENSE)
 
-[下载 Windows 正式版](https://github.com/Riderich/JHenTai-Image-Translation/releases/latest) · [报告问题](https://github.com/Riderich/JHenTai-Image-Translation/issues/new/choose) · [查看更新记录](https://github.com/Riderich/JHenTai-Image-Translation/releases)
+[下载](https://github.com/Riderich/Yomikae/releases/latest) · [报告问题](https://github.com/Riderich/Yomikae/issues/new/choose) · [更新记录](https://github.com/Riderich/Yomikae/releases)
 
-## 项目简介
+Yomikae（読み替え，“换一种方式来读”）由 [JHenTai](https://github.com/jiangtian616/JHenTai) 衍生而来，是独立维护的社区项目，**不是 JHenTai 官方版本**，也未获得原作者背书。本项目特有的问题请在本仓库反馈，不要提交给 JHenTai。
 
-这是一个基于 [JHenTai](https://github.com/jiangtian616/JHenTai) 开发的漫画图片翻译版本。项目把完整翻译流程接入阅读界面，让用户找到日文漫画后，直接在软件内生成并阅读中文译图。
+## 主要功能
 
-当前正式支持 **Windows x64**。安卓独立版仍在规划中；现阶段的 Release 不包含安卓翻译功能。
+### 找本子
 
-本项目是社区衍生版本，并非 JHenTai 官方版本。使用中遇到的问题请提交到本仓库，不要向原版 JHenTai 报告本项目特有的问题。
+- **发现**：排行榜、热门、最新一页看完，分类、语言、评分在筛选里
+- **找本子**：十个分类一键直达；**标签浏览**按作者、社团、原作、角色、女性、男性等类型列出全部标签，显示中文名，按全站使用次数排序，可筛选
+- **相似作品**：从任意作品出发，找同名的其他版本、同作者、同社团、同上传者，或“内容最相似”（自动选这本最有特点的标签组合搜索）
 
-## 当前功能
+### 追作者、汉化组
 
-- 在阅读界面翻译当前页
-- Windows 阅读界面右键图片即可翻译、重新翻译或切换原图/译图
-- 手动设置起始页和结束页，串行翻译指定范围
-- 显示范围任务进度，并可在当前页完成后停止
-- 在原图与译图之间切换
-- 本地缓存已经完成的译图，避免重复消耗时间和 API
-- 自定义 OpenAI 兼容 API 地址、API Key 和任意模型名称
-- DeepSeek 作为默认预设，也可连接其他云端服务或本机兼容接口
-- 可选择是否发送关闭思考参数
-- 支持 NLLB 600M / 1.3B 本地翻译，不需要 API Key
-- 软件内一键初始化 Windows 翻译环境
-- 自动准备 Python、隔离环境、检测/OCR/擦字依赖及默认模型
-- 初始化完成后由 JHenTai 自动启动本地翻译服务
+- **关注**：上传者（汉化组的号）、作者、社团、任意标签都能点星标关注
+- 打开关注页时检查新作，有新作的显示数字，底部图标也有红点；点进去即标记为已看
+- 只在你打开时检查，不在后台运行
 
-## 下载
+### 了解自己的口味
 
-请从 [Releases](https://github.com/Riderich/JHenTai-Image-Translation/releases) 下载最新的 Windows 正式版。
+- **书架 → 口味**：统计全部收藏里最常出现的作者、社团、上传者、原作、角色和标签
+- 内容标签按“在你收藏里常见、在全站不常见”排序，突出真正的偏好
+- 每一项都能直接搜索或关注；统计结果缓存在本地，之后只补新收藏
 
-当前正式版：
+### 漫画翻译
 
-- [JHenTai Image Translation v1.0.0](https://github.com/Riderich/JHenTai-Image-Translation/releases/tag/v1.0.0)
+- **安卓：本机识别**。文字检测和日文识别（PP-OCRv6，约 31 MB 模型）在手机上完成，只有识别出的文字发给你配置的大模型 API（DeepSeek 等 OpenAI 兼容接口），译文擦字嵌回原图，支持竖排
+- **Windows：本地翻译服务**。软件内一键初始化 Python 环境，使用 manga-image-translator 流程，可选自定义 API 或 NLLB 本地模型
+- 阅读页长按图片即可翻译本页；翻译完成会显示各阶段耗时
 
-下载后必须**完整解压**，不要直接在压缩包中运行程序。目录中的 `app`、`translation_service` 和 `translation_engine` 都是初始化所需内容。
+## 下载与安装
 
-## 首次初始化
+从 [Releases](https://github.com/Riderich/Yomikae/releases/latest) 下载：
 
-1. 运行 `app/jhentai.exe`。
-2. 打开 **设置 → 漫画翻译**。
-3. 点击 **初始化翻译环境**。
-4. 等待软件自动安装独立 Python 环境、图片处理依赖和默认模型。
-5. 初始化完成后，状态会变成“翻译服务已就绪”。
-6. 选择自定义 API 或 NLLB 本地翻译。使用 API 时填写服务地址、Key 和模型名称，然后保存并测试连接。
-
-初始化预计下载约 **4–7 GB**，建议至少预留 **12 GB** 可用空间。网络速度、PyTorch 依赖和模型下载会显著影响耗时。下载中断后可以点击重试，已经下载或安装的内容会尽量复用。
-
-初始化器会自动检测 NVIDIA 显卡。用户可以选择 CUDA 12.8 加速；驱动或运行时验证失败时会自动回退 CPU 兼容模式。
-
-## 翻译漫画
-
-1. 在 JHenTai 中打开一本漫画并进入阅读界面。
-2. 打开顶部菜单，点击翻译图标。
-3. 选择 **翻译当前页**，或者选择 **翻译页面范围…**。
-4. 等待检测、OCR、所选翻译模型、擦字和中文嵌字完成。
-5. 使用菜单中的 **显示原图/显示译图** 检查效果。
-
-范围翻译每次只处理一页，避免同时占用过多内存、显存和 API 请求。已经成功缓存的页面会自动跳过。
-
-## 工作流程
-
-```text
-漫画原图
-  → 本机文字区域检测
-  → 本机日文 OCR
-  → 自定义 API 或 NLLB 本地模型翻译识别出的文字
-  → 本机擦除原文
-  → 本机排版并嵌入中文
-  → 缓存并显示完整译图
-```
-
-图片处理通过本机 `127.0.0.1` 服务完成。API Key 保存在 JHenTai 的本机配置中，并随翻译请求传给本机服务；所选 API 服务商接收需要翻译的文字。本地 NLLB 模式不会调用翻译 API。请勿把本项目的本地 HTTP 服务暴露到公网，也不要把自己的 Key 写入源码、日志或 Issue。
-
-## 资源消耗
-
-| 阶段 | 主要资源 | 说明 |
+| 平台 | 文件 | 说明 |
 |---|---|---|
-| 初始化 | 网络、磁盘、CPU | 安装 Python/PyTorch 依赖并下载模型，耗时最长 |
-| 文字检测与 OCR | CPU/GPU、内存/显存 | 可用 CUDA 时可启用 GPU；漫画分辨率越高耗时越长 |
-| 自定义 API 翻译 | 网络、API 额度 | 支持 OpenAI 兼容接口，思考开关由用户决定 |
-| NLLB 本地翻译 | CPU/GPU、内存/显存 | 无 API 成本；CUDA 设备建议使用更大的 1.3B 模型 |
-| 擦字与中文嵌字 | CPU、内存 | 在本机生成最终译图 |
-| 译图缓存 | 磁盘 | 已翻译页面会保存在 JHenTai 数据目录中 |
+| 安卓（绝大多数手机） | `app-arm64-v8a-release.apk` | 包名 `com.riderich.yomikae` |
+| 安卓（老旧 32 位设备） | `app-armeabi-v7a-release.apk` | |
+| Windows x64 | 压缩包 | 解压后运行，翻译需先在设置里初始化环境 |
 
-## 已知限制
+Yomikae 与 JHenTai、旧的“JHenTai 翻译版”是不同的应用，可以同时安装，设置不会自动迁移。
 
-- 当前只发布 Windows x64 一键初始化包
-- 首次初始化下载量大，部分网络环境可能需要重试
-- 不支持 CUDA 的设备会使用 CPU 模式，处理速度较慢
-- Clash 系统代理、TUN/虚拟网卡或安全软件可能影响 Python、模型和 API 服务连接
-- OCR、气泡检测、擦字与排版仍可能出现错误
-- API Key 当前保存在本机应用配置中，尚未接入系统凭据保险库
-- 安卓端需要独立的移动推理实现，不能直接把 Windows/Python 后端打包进 APK
+## 安卓翻译怎么用
 
-## 问题反馈与参与开发
+1. **设置 → 漫画翻译**，选择“手机本机识别”，点击“下载模型”（约 31 MB，可选 Hugging Face 或国内镜像）
+2. 填写大模型 API 地址、Key 和模型名（默认预设为 DeepSeek），点“测试连接”
+3. 在阅读页长按图片，选择“翻译本页”
 
-遇到初始化、连接或翻译问题时，请使用仓库的 [Issue 模板](https://github.com/Riderich/JHenTai-Image-Translation/issues/new/choose)，并附上 Windows 版本、软件版本、CPU/GPU、翻译方式及可公开的错误信息。请先删除 API Key、Cookie、访问令牌和漫画图片中的隐私内容。
+只有识别出的文字会发送给你配置的 API 服务商，图片不会离开手机。
 
-如果希望贡献代码，请先阅读 [贡献指南](CONTRIBUTING.md)；安全问题请按照 [安全说明](SECURITY.md) 私下报告。
+## Windows 翻译怎么用
 
-稳定分支：`main`。功能开发分支：`feature/image-translation`。
+1. 完整解压后运行 `app/jhentai.exe`，打开 **设置 → 漫画翻译 → 初始化翻译环境**
+2. 初始化会自动准备独立 Python 环境、依赖和默认模型，预计下载 4–7 GB，建议预留 12 GB 空间；检测到 NVIDIA 显卡时可选 CUDA 加速
+3. 选择自定义 API 或 NLLB 本地翻译，保存并测试连接
+4. 阅读界面右键图片即可翻译当前页、重新翻译或切换原图/译图；也可以指定页码范围串行翻译
 
-本地构建 Windows 版：
+翻译服务只监听本机 `127.0.0.1`，请勿暴露到公网，也不要把 API Key 写进源码、日志或 Issue。
+
+## 旧版界面
+
+新界面（底部 发现 / 找本子 / 关注 / 书架）默认开启。想用原来的侧边栏导航：**设置 → 样式 → 关闭“新版导航”**。平板和电脑布局保持原样。
+
+## 构建
 
 ```powershell
 flutter pub get
+flutter build apk --release --split-per-abi -t lib/src/main.dart
 flutter build windows --release -t lib/src/main.dart
 ```
 
-翻译适配层位于 `translation_service/`。对 `manga-image-translator` 的必要兼容改动以补丁形式保存在：
+Windows 翻译适配层在 `translation_service/`，对 manga-image-translator 的兼容改动以补丁形式保存在 `translation_service/manga-image-translator.patch`。贡献前请阅读 [贡献指南](CONTRIBUTING.md)；安全问题请按 [安全说明](SECURITY.md) 私下报告。
 
-```text
-translation_service/manga-image-translator.patch
-```
+## 来源与致谢
 
-## 上游项目与致谢
+- [JHenTai](https://github.com/jiangtian616/JHenTai)（jiangtian616，Apache-2.0）：本项目的代码基础，包括 E-Hentai 访问、下载、阅读器等绝大部分功能
+- [PaddleOCR / PP-OCRv6](https://github.com/PaddlePaddle/PaddleOCR)（Apache-2.0）与 [fumetodev 的漫画识别模型](https://huggingface.co/fumetodev/PP-OCRv6_small_rec_manga_ONNX)：安卓本机文字检测与识别
+- [ONNX Runtime](https://onnxruntime.ai/)：安卓端模型推理
+- [manga-image-translator](https://github.com/zyddnys/manga-image-translator)：Windows 端翻译流程
+- [EhTagTranslation](https://github.com/EhTagTranslation/Database)：标签中文翻译；[e-hentai-tag-count](https://github.com/mokurin000/e-hentai-tag-count)：标签使用次数
 
-本仓库是在以下开源项目基础上进行的社区衍生开发：
-
-- [JHenTai](https://github.com/jiangtian616/JHenTai)：跨平台 E-Hentai/ExHentai 客户端与阅读器界面
-- [manga-image-translator](https://github.com/zyddnys/manga-image-translator)：文字检测、OCR、翻译、擦字和嵌字流程
-- [DeepSeek](https://www.deepseek.com/)：可选的在线机器翻译模型服务
-
-本项目名称中的 JHenTai 用于说明技术来源和兼容关系，不代表获得原项目官方背书。
+详细的来源与修改说明见 [NOTICE](NOTICE)。
 
 ## 许可证
 
-本仓库继续遵循 [Apache License 2.0](LICENSE)。上游依赖、模型、字体和第三方服务分别适用其各自的许可证及使用条款。
+[Apache License 2.0](LICENSE)。模型、数据库、字体和第三方服务分别适用各自的许可证与使用条款。

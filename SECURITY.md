@@ -2,7 +2,7 @@
 
 ## 支持版本
 
-安全修复优先覆盖最新正式版。请先确认问题仍能在 [最新 Release](https://github.com/Riderich/JHenTai-Image-Translation/releases/latest) 中复现。
+安全修复优先覆盖最新正式版。请先确认问题仍能在 [最新 Release](https://github.com/Riderich/Yomikae/releases/latest) 中复现。
 
 ## 报告安全问题
 

@@ -926,7 +926,7 @@ abstract class BaseLayoutLogic extends GetxController
     SaveResult saveResult = await SaverGallery.saveImage(
       imageData,
       name: fileName,
-      androidRelativePath: "Pictures/JHenTai",
+      androidRelativePath: "Pictures/Yomikae",
       androidExistNotSave: false,
     );
 
@@ -941,7 +941,7 @@ abstract class BaseLayoutLogic extends GetxController
     SaveResult saveResult = await SaverGallery.saveFile(
       file: filePath,
       name: fileName,
-      androidRelativePath: "Pictures/JHenTai",
+      androidRelativePath: "Pictures/Yomikae",
       androidExistNotSave: false,
     );
 

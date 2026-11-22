@@ -43,7 +43,7 @@ class zh_CN {
       'imageTranslation': '漫画翻译',
       'translationSettings': '翻译设置',
       'translationServiceHint':
-          'JHenTai 会把当前页发送到本地翻译服务。服务负责文字检测、OCR、翻译、擦字修复和中文嵌字，再返回完整译图。',
+          'Yomikae 会把当前页发送到本地翻译服务。服务负责文字检测、OCR、翻译、擦字修复和中文嵌字，再返回完整译图。',
       'translationRuntimeTitle': '本机翻译环境',
       'initializeTranslationRuntime': '初始化翻译环境',
       'startTranslationRuntime': '启动翻译服务',
@@ -281,7 +281,7 @@ class zh_CN {
       'hasDownloaded': '已下载',
       '410Hints': '下载此归档次数过多，你需要重新购买、解锁后才能继续下载',
       '429Hints': '下载请求过多！请减小归档下载并发度或稍后再试。',
-      'getUnpackedImagesFailedMsg': 'JHenTai无法读取此归档的图片，请检查本地文件是否正常',
+      'getUnpackedImagesFailedMsg': 'Yomikae无法读取此归档的图片，请检查本地文件是否正常',
       'getGalleryTorrentsFailed': '获取种子失败',
       'chooseArchive': '选择归档',
       'tagSetExceedLimit': '标签数量已达到上限',
@@ -312,7 +312,7 @@ class zh_CN {
       'voteCommentFailed': '投票评论失败',
       'unknownUser': '未知用户',
       'atLeast3Characters': '至少3个字符',
-      'noJHenTaiHints': '请不要提及JHenTai，感谢理解',
+      'noJHenTaiHints': '请不要提及Yomikae，感谢理解',
       'blockUser': '屏蔽用户',
 
       /// EHImage
@@ -328,7 +328,7 @@ class zh_CN {
       'exceedImageLimits': "超出图片配额限制",
       'ehServerError': 'E站服务器发生错误，请稍后重试',
       'unsupportedImagePageStyle':
-          "JHenTai当前不支持Multi-Page Viewer(MPV)多页查看，请在e-hentai.org更换为默认风格",
+          "Yomikae当前不支持Multi-Page Viewer(MPV)多页查看，请在e-hentai.org更换为默认风格",
       'toNext': '下一页',
       'toPrev': '上一页',
       'back': '返回',
@@ -369,7 +369,7 @@ class zh_CN {
       'redirectAllGallery': '重定向所有画廊至表站',
       'imDonorHint': '如果你是捐赠者，你可以打开此项来更容易地访问里站中的画廊',
       'profileSetting': 'Profile设置',
-      'chooseProfileHint': '选择在JHenTai中使用的Profile',
+      'chooseProfileHint': '选择在Yomikae中使用的Profile',
       'siteSetting': '站点设置',
       'siteSettingHint': '更改E站个人设置',
       'showCookie': '查看 Cookie',
@@ -538,7 +538,7 @@ class zh_CN {
       'superResolveOriginalImageHint': '处理原图会耗费更多的时间、空间和性能，确定继续？',
       'verityAppLinks4Android12': '验证应用链接（安卓12+）',
       'verityAppLinks4Android12Hint':
-          '对于Android 12+，您需要手动添加链接到已验证链接才能在其他应用中唤起JHenTai',
+          '对于Android 12+，您需要手动添加链接到已验证链接才能在其他应用中唤起Yomikae',
       'noImageMode': '无图模式',
       'exportData': '导出数据',
       'exportDataHint': '导出配置、屏蔽规则与历史记录',
@@ -697,9 +697,9 @@ class zh_CN {
       'reUnlockHint': '注意！重新解锁需要重新购买此归档！',
       'downloadHelpInfo': '如果发现无法下载，在日志中发现了数据库表不存在等问题，卸载当前app重装即可。',
       'localGalleryHelpInfo':
-          '加载那些不是由JHenTai下载的画廊(当做本地阅览器)。在下载设置-额外的画廊扫描路径中配置，之后刷新即可',
+          '加载那些不是由Yomikae下载的画廊(当做本地阅览器)。在下载设置-额外的画廊扫描路径中配置，之后刷新即可',
       'localGalleryHelpInfo4iOSAndMacOS':
-          '加载那些不是由JHenTai下载的画廊(当做本地阅览器)。将你的画廊放在默认下载路径下，之后刷新即可',
+          '加载那些不是由Yomikae下载的画廊(当做本地阅览器)。将你的画廊放在默认下载路径下，之后刷新即可',
       'deleteLocalGalleryHint': '删除您的本地文件',
       'priority': '优先级',
       'highest': '最高',
@@ -899,8 +899,8 @@ favnote：匹配收藏备注
       'parseFailed': '解析失败',
       'checkedIn': '今日已签到',
       'serverError': '归档机器人内部错误',
-      'useProxyServer': '使用JHenTai代理服务器',
-      'useProxyServerHint': '通过JHenTai服务器中转请求',
+      'useProxyServer': '使用Yomikae代理服务器',
+      'useProxyServerHint': '通过Yomikae服务器中转请求',
 
       /// password setting dialog
       'setPasswordHint': '请输入您的密码',
@@ -979,6 +979,7 @@ favnote：匹配收藏备注
       'chooseTagSet': '选择标签集',
 
       /// modern layout
+      'basedOnJHenTai': '基于 JHenTai（作者 酱天小禽兽 / JTMonster，Apache-2.0）',
       'discover': '发现',
       'find': '找本子',
       'follow': '关注',
