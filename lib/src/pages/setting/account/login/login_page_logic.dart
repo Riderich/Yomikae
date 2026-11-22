@@ -179,6 +179,8 @@ class LoginPageLogic extends GetxController with GetSingleTickerProviderStateMix
     }
 
     log.info('Login success by password.');
+    // offer to save the credentials in the password manager
+    TextInput.finishAutofillContext();
 
     userSetting.saveUserInfo(
       userName: state.userName!,

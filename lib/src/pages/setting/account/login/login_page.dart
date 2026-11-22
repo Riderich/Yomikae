@@ -78,13 +78,17 @@ class _PasswordTabBody extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: UIConfig.loginPageForegroundColor(context), width: 2),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildUsernameField(context),
-              _buildPasswordField(context).marginOnly(top: 16),
-              _buildLoginButton(context).marginOnly(top: 24),
-            ],
+          // lets Android offer passwords saved in the password manager (Google
+          // Password Manager also holds the ones saved in Chrome)
+          child: AutofillGroup(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildUsernameField(context),
+                _buildPasswordField(context).marginOnly(top: 16),
+                _buildLoginButton(context).marginOnly(top: 24),
+              ],
+            ),
           ),
         ),
       ),
@@ -98,6 +102,9 @@ class _PasswordTabBody extends StatelessWidget {
       child: TextFormField(
         onEditingComplete: state.passwordFocusNode.requestFocus,
         onChanged: (userName) => state.userName = userName,
+        autofillHints: const [AutofillHints.username],
+        keyboardType: TextInputType.text,
+        textInputAction: TextInputAction.next,
         decoration: InputDecoration(
           hintText: 'userName'.tr,
           hintStyle: TextStyle(color: UIConfig.loginPageTextHintColor(context), fontSize: UIConfig.loginPageTextHintSize, height: 1),
@@ -116,6 +123,9 @@ class _PasswordTabBody extends StatelessWidget {
           focusNode: state.passwordFocusNode,
           obscureText: state.obscureText,
           onChanged: (password) => state.password = password,
+          autofillHints: const [AutofillHints.password],
+          keyboardType: TextInputType.visiblePassword,
+          textInputAction: TextInputAction.done,
           onFieldSubmitted: (v) => logic.handleLogin(),
           decoration: InputDecoration(
             hintText: 'password'.tr,

@@ -75,28 +75,40 @@ class _ModernLayoutPageState extends State<ModernLayoutPage> {
         ),
         bottomNavigationBar: GetBuilder<FollowService>(
           id: FollowService.entriesId,
-          builder: (_) => NavigationBar(
-            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-            selectedIndex: _index,
-            onDestinationSelected: _select,
-            destinations: [
-              NavigationDestination(icon: const Icon(Icons.explore_outlined), selectedIcon: const Icon(Icons.explore), label: 'discover'.tr),
-              NavigationDestination(icon: const Icon(Icons.manage_search), selectedIcon: const Icon(Icons.manage_search), label: 'find'.tr),
-              NavigationDestination(
-                icon: Badge(
-                  isLabelVisible: followService.totalNewCount > 0,
-                  label: Text(followService.totalNewCount > 99 ? '99+' : '${followService.totalNewCount}'),
-                  child: const Icon(Icons.star_outline),
-                ),
-                selectedIcon: Badge(
-                  isLabelVisible: followService.totalNewCount > 0,
-                  label: Text(followService.totalNewCount > 99 ? '99+' : '${followService.totalNewCount}'),
-                  child: const Icon(Icons.star),
-                ),
-                label: 'follow'.tr,
+          // 30% larger than the Material default (80 high, 24 icons, 12 labels):
+          // the bottom edge of a phone is the hardest place to hit
+          builder: (_) => NavigationBarTheme(
+            data: NavigationBarTheme.of(context).copyWith(
+              height: 104,
+              iconTheme: const WidgetStatePropertyAll(IconThemeData(size: 31)),
+              labelTextStyle: WidgetStateProperty.resolveWith(
+                (states) => TextStyle(fontSize: 15, fontWeight: states.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w400),
               ),
-              NavigationDestination(icon: const Icon(Icons.collections_bookmark_outlined), selectedIcon: const Icon(Icons.collections_bookmark), label: 'bookshelf'.tr),
-            ],
+            ),
+            child: NavigationBar(
+              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+              selectedIndex: _index,
+              onDestinationSelected: _select,
+              destinations: [
+                NavigationDestination(icon: const Icon(Icons.explore_outlined), selectedIcon: const Icon(Icons.explore), label: 'discover'.tr),
+                NavigationDestination(icon: const Icon(Icons.manage_search), selectedIcon: const Icon(Icons.manage_search), label: 'find'.tr),
+                NavigationDestination(
+                  icon: Badge(
+                    isLabelVisible: followService.totalNewCount > 0,
+                    label: Text(followService.totalNewCount > 99 ? '99+' : '${followService.totalNewCount}'),
+                    child: const Icon(Icons.star_outline),
+                  ),
+                  selectedIcon: Badge(
+                    isLabelVisible: followService.totalNewCount > 0,
+                    label: Text(followService.totalNewCount > 99 ? '99+' : '${followService.totalNewCount}'),
+                    child: const Icon(Icons.star),
+                  ),
+                  label: 'follow'.tr,
+                ),
+                NavigationDestination(
+                    icon: const Icon(Icons.collections_bookmark_outlined), selectedIcon: const Icon(Icons.collections_bookmark), label: 'bookshelf'.tr),
+              ],
+            ),
           ),
         ),
       ),
