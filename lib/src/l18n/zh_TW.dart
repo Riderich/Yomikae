@@ -70,8 +70,8 @@ class zh_TW {
       'passwordTab': '帳號密碼',
       'cookieTab': 'Cookie',
       'webTab': 'Web',
-      'webTabHint': '點擊下方按鈕啟動瀏覽器，在瀏覽器中完成登入後自動返回',
-      'launchWebLogin': '啟動瀏覽器登入',
+      'webTabHint': '在 App 內開啟 E 站登入頁，可以通過 Cloudflare 人機驗證；頁面下方的帳號密碼欄支援自動填入手機裡儲存的密碼。登入成功後自動返回',
+      'launchWebLogin': '開啟網頁登入',
       'onlineVerification': '線上驗證',
       'webviewVerification': 'WebView驗證',
       'skipVerification': '跳過驗證',
@@ -881,6 +881,9 @@ favnote：配對收藏備註
       'chooseTagSet': '選擇標籤集',
 
       /// modern layout
+      'webLoginFillHint': '完成上方的人機驗證、出現 E 站登入頁後，在這裡填帳號密碼（可用手機儲存的密碼自動填入）',
+      'webLoginFillAndSubmit': '填入並登入',
+      'webLoginFormNotReady': '還沒看到 E 站登入頁，請先完成上方的人機驗證',
       'basedOnJHenTai': '基於 JHenTai（作者 醬天小禽獸 / JTMonster，Apache-2.0）',
       'discover': '發現',
       'find': '找本子',

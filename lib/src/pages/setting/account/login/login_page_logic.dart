@@ -561,6 +561,7 @@ class LoginPageLogic extends GetxController with GetSingleTickerProviderStateMix
           'title': 'login'.tr,
           'url': EHConsts.ELogin,
           'onPageStarted': _onMobilePageStarted4WebLogin,
+          'fillLogin': true,
         },
       );
     }

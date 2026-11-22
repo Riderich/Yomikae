@@ -159,9 +159,8 @@ class en_US {
       'passwordTab': 'Account',
       'cookieTab': 'Cookie',
       'webTab': 'Web',
-      'webTabHint':
-          'Click the button below to launch the browser. After logging in, you will be returned automatically.',
-      'launchWebLogin': 'Launch Browser Login',
+      'webTabHint': 'Opens the E-Hentai login page inside the app, where the Cloudflare check can be passed; the account bar below the page can autofill saved passwords. Returns automatically after logging in',
+      'launchWebLogin': 'Open web login',
       'onlineVerification': 'Online Verification',
       'webviewVerification': 'WebView Verification',
       'skipVerification': 'Skip Verification',
@@ -1034,6 +1033,9 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'chooseTagSet': 'Choose Tag Set',
 
       /// modern layout
+      'webLoginFillHint': 'After the human check above, when the E-Hentai login page shows, enter your account here (saved passwords can be autofilled)',
+      'webLoginFillAndSubmit': 'Fill in and log in',
+      'webLoginFormNotReady': 'The E-Hentai login page is not shown yet, finish the human check above first',
       'basedOnJHenTai': 'Based on JHenTai by JTMonster (Apache-2.0)',
       'discover': 'Discover',
       'find': 'Find',

@@ -157,8 +157,8 @@ class zh_CN {
       'passwordTab': '账号密码',
       'cookieTab': 'Cookie',
       'webTab': 'Web',
-      'webTabHint': '点击下方按钮启动浏览器，在浏览器中完成登录后自动返回',
-      'launchWebLogin': '启动浏览器登录',
+      'webTabHint': '在 App 内打开 E 站登录页，可以通过 Cloudflare 人机验证；页面下方的账号密码栏支持自动填充手机里保存的密码。登录成功后自动返回',
+      'launchWebLogin': '打开网页登录',
       'onlineVerification': '在线验证',
       'webviewVerification': 'WebView验证',
       'skipVerification': '跳过验证',
@@ -979,6 +979,9 @@ favnote：匹配收藏备注
       'chooseTagSet': '选择标签集',
 
       /// modern layout
+      'webLoginFillHint': '完成上方的人机验证、出现 E 站登录页后，在这里填账号密码（可用手机保存的密码自动填充）',
+      'webLoginFillAndSubmit': '填入并登录',
+      'webLoginFormNotReady': '还没看到 E 站登录页，请先完成上方的人机验证',
       'basedOnJHenTai': '基于 JHenTai（作者 酱天小禽兽 / JTMonster，Apache-2.0）',
       'discover': '发现',
       'find': '找本子',
