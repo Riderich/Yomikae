@@ -62,6 +62,7 @@ import '../../service/history_service.dart';
 import '../../service/gallery_download/download_path_resolver.dart';
 import '../../service/gallery_download/gallery_download_service.dart';
 import '../../service/local_block_rule_service.dart';
+import '../../service/quick_search_service.dart';
 import '../../service/storage_service.dart';
 import '../../setting/eh_setting.dart';
 import '../../setting/read_setting.dart';
@@ -987,6 +988,13 @@ class DetailsPageLogic extends GetxController with LoginRequiredMixin, Scroll2To
       ),
     );
     toast('success'.tr);
+  }
+
+  Future<void> toggleFavoriteUploader() async {
+    if (uploader.isEmpty) {
+      return;
+    }
+    await quickSearchService.toggleFavoriteUploader(uploader);
   }
 
   Future<void> blockTitle(String title) async {

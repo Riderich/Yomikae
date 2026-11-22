@@ -8,6 +8,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
+import 'package:jhentai/src/service/quick_search_service.dart';
 import 'package:jhentai/src/enum/eh_namespace.dart';
 import 'package:jhentai/src/extension/string_extension.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
@@ -427,7 +428,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
       global: false,
       init: logic,
       builder: (_) {
-        return GestureDetector(
+        Widget uploaderText = GestureDetector(
           onLongPress: isEmptyOrNull(logic.uploader)
               ? null
               : () async {
@@ -454,10 +455,50 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                   },
                 ),
               );
+              toolbar.buttonItems?.add(
+                ContextMenuButtonItem(
+                  label: quickSearchService.isFavoriteUploader(logic.uploader) ? 'unFavoriteUploader'.tr : 'favoriteUploader'.tr,
+                  onPressed: () {
+                    ContextMenuController.removeAny();
+                    logic.toggleFavoriteUploader();
+                  },
+                ),
+              );
 
               return toolbar;
             },
           ),
+        );
+
+        if (isEmptyOrNull(logic.uploader)) {
+          return uploaderText;
+        }
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(child: uploaderText),
+            GetBuilder<QuickSearchService>(
+              builder: (_) {
+                bool favorited = quickSearchService.isFavoriteUploader(logic.uploader);
+                return Tooltip(
+                  message: favorited ? 'unFavoriteUploader'.tr : 'favoriteUploader'.tr,
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: logic.toggleFavoriteUploader,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      child: Icon(
+                        favorited ? Icons.star_rounded : Icons.star_border_rounded,
+                        size: UIConfig.detailsPageUploaderTextSize + 5,
+                        color: favorited ? Colors.amber : UIConfig.detailsPageUploaderTextColor(context),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
         );
       },
     );

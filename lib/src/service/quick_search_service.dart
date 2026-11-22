@@ -74,6 +74,38 @@ class QuickSearchService extends GetxController with JHLifeCircleBeanWithConfigS
     update();
   }
 
+  /// 收藏的上传者以快速搜索的形式保存，关键词为 uploader:"xxx"
+  static String uploaderKeyword(String uploader) => 'uploader:"$uploader"';
+
+  /// 返回收藏该上传者的快速搜索名称，未收藏则返回 null。
+  /// 只匹配关键词，用户在快速搜索里改了名字或分类过滤后仍能识别。
+  String? findFavoriteUploaderName(String uploader) {
+    String keyword = uploaderKeyword(uploader);
+    for (MapEntry<String, SearchConfig> entry in quickSearchConfigs.entries) {
+      if (entry.value.keyword?.trim() == keyword && (entry.value.tags?.isEmpty ?? true)) {
+        return entry.key;
+      }
+    }
+    return null;
+  }
+
+  bool isFavoriteUploader(String uploader) => findFavoriteUploaderName(uploader) != null;
+
+  Future<void> toggleFavoriteUploader(String uploader) async {
+    if (uploader.trim().isEmpty) {
+      return;
+    }
+
+    String? existingName = findFavoriteUploaderName(uploader);
+    if (existingName != null) {
+      await removeQuickSearch(existingName);
+      toast('unFavoriteUploaderSuccess'.tr);
+      return;
+    }
+
+    await addQuickSearch('${'uploader'.tr}: $uploader', SearchConfig(keyword: uploaderKeyword(uploader)));
+  }
+
   Future<void> reOrderQuickSearch(int oldIndex, int newIndex) async {
     log.info('reOrder quick search, oldIndex:$oldIndex, newIndex:$newIndex');
 
