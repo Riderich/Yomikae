@@ -4,6 +4,7 @@ import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/pages/gallery/dashboard/dashboard_page.dart';
 import 'package:jhentai/src/pages/modern/favorite_folder_chips.dart';
+import 'package:jhentai/src/pages/modern/recommend_feedback_sheet.dart';
 import 'package:jhentai/src/routes/routes.dart';
 import 'package:jhentai/src/service/recommend_service.dart';
 import 'package:jhentai/src/utils/route_util.dart';
@@ -77,7 +78,10 @@ class DiscoverPage extends DashboardPage {
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 10),
                         itemCount: r.galleries.length > 20 ? 20 : r.galleries.length,
-                        itemBuilder: (_, index) => EHDashboardCard(gallery: r.galleries[index]),
+                        itemBuilder: (_, index) => EHDashboardCard(
+                          gallery: r.galleries[index],
+                          onLongPress: () => RecommendFeedbackSheet.showForGallery(context, r.galleries[index]),
+                        ),
                         separatorBuilder: (_, __) => const VerticalDivider(),
                       ).enableMouseDrag(withScrollBar: false),
                     )

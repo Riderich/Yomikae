@@ -48,51 +48,151 @@ Reply with JSON only, in exactly this form: {"translations":[{"id":<id>,"text":"
     if (texts.isEmpty) {
       return {};
     }
+    final String user = jsonEncode(texts.entries.map((e) => {'id': e.key, 'text': e.value}).toList());
+    final String content = await _complete(systemPrompt(targetLanguage), user, json: true, receiveTimeout: timeout);
+    return parseTranslations(content);
+  }
+
+  /// Minimal request to check the URL, key and model. Throws an
+  /// [LlmApiException] that says what went wrong.
+  Future<void> ping() async {
+    await _complete(null, 'Reply only with OK', json: false, receiveTimeout: const Duration(seconds: 30));
+  }
+
+  /// Sends one request, trying the candidate endpoints of [baseUrl] in order
+  /// (moving on only after 404/405), and retries once without optional
+  /// parameters when the API rejects the request (some APIs refuse
+  /// `thinking`, `temperature` or `response_format`).
+  Future<String> _complete(String? system, String user, {required bool json, required Duration receiveTimeout}) async {
     final Dio dio = Dio(BaseOptions(
       connectTimeout: const Duration(seconds: 15),
-      sendTimeout: timeout,
-      receiveTimeout: timeout,
+      sendTimeout: receiveTimeout,
+      receiveTimeout: receiveTimeout,
       headers: {
         if (apiKey.trim().isNotEmpty) 'Authorization': 'Bearer ${apiKey.trim()}',
         'Content-Type': 'application/json',
       },
     ));
 
-    final Map<String, dynamic> body = {
-      'model': model,
-      'temperature': 0.3,
-      'response_format': {'type': 'json_object'},
-      'messages': [
-        {'role': 'system', 'content': systemPrompt(targetLanguage)},
-        {
-          'role': 'user',
-          'content': jsonEncode(texts.entries.map((e) => {'id': e.key, 'text': e.value}).toList()),
-        },
-      ],
-      if (disableThinking) 'thinking': {'type': 'disabled'},
-    };
-
-    final Response<dynamic> response = await dio.post('${_trimSlash(baseUrl)}/chat/completions', data: body);
-    final dynamic data = response.data is String ? jsonDecode(response.data as String) : response.data;
-    final String content = data['choices'][0]['message']['content'] as String;
-    return parseTranslations(content);
+    LlmApiException? lastError;
+    for (final LlmEndpoint endpoint in endpointsOf(baseUrl)) {
+      for (final bool minimal in [false, true]) {
+        final Map<String, dynamic> body = requestBody(endpoint.api, model, system, user, json: json, disableThinking: disableThinking, minimal: minimal);
+        Response<dynamic> response;
+        try {
+          response = await dio.post(endpoint.url, data: body);
+        } on DioException catch (e) {
+          lastError = LlmApiException.fromDio(endpoint.url, e);
+          final int? status = e.response?.statusCode;
+          if (!minimal && (status == 400 || status == 422)) {
+            continue;
+          }
+          break;
+        }
+        try {
+          final dynamic data = response.data is String ? jsonDecode(response.data as String) : response.data;
+          return replyText(endpoint.api, data);
+        } catch (e) {
+          throw LlmApiException(endpoint.url, response.statusCode, 'unexpected reply: $e');
+        }
+      }
+      if (lastError?.status != 404 && lastError?.status != 405) {
+        break;
+      }
+    }
+    throw lastError!;
   }
 
-  /// Minimal request to check the URL, key and model.
-  Future<void> ping() async {
-    final Dio dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 30),
-      headers: {if (apiKey.trim().isNotEmpty) 'Authorization': 'Bearer ${apiKey.trim()}'},
-    ));
-    await dio.post('${_trimSlash(baseUrl)}/chat/completions', data: {
+  /// The endpoints to try for what the user typed as the API address:
+  /// - a full `.../chat/completions` or `.../responses` URL is used as is;
+  /// - a base URL with a path (`.../v1`, `.../compatible-mode/v1`) gets
+  ///   `/chat/completions`;
+  /// - a bare host gets `/v1/chat/completions`, then `/chat/completions`.
+  static List<LlmEndpoint> endpointsOf(String baseUrl) {
+    String url = baseUrl.trim();
+    while (url.endsWith('/')) {
+      url = url.substring(0, url.length - 1);
+    }
+    if (url.isNotEmpty && !url.contains('://')) {
+      url = 'https://$url';
+    }
+    final String lower = url.toLowerCase();
+    if (lower.endsWith('/chat/completions')) {
+      return [LlmEndpoint(url, LlmApi.chat)];
+    }
+    if (lower.endsWith('/responses')) {
+      return [LlmEndpoint(url, LlmApi.responses)];
+    }
+    final Uri? uri = Uri.tryParse(url);
+    if (uri != null && (uri.path.isEmpty || uri.path == '/')) {
+      return [LlmEndpoint('$url/v1/chat/completions', LlmApi.chat), LlmEndpoint('$url/chat/completions', LlmApi.chat)];
+    }
+    return [LlmEndpoint('$url/chat/completions', LlmApi.chat)];
+  }
+
+  /// [minimal] leaves out everything but the model and the prompt.
+  static Map<String, dynamic> requestBody(
+    LlmApi api,
+    String model,
+    String? system,
+    String user, {
+    required bool json,
+    required bool disableThinking,
+    required bool minimal,
+  }) {
+    if (api == LlmApi.responses) {
+      return {
+        'model': model,
+        if (system != null) 'instructions': system,
+        'input': user,
+        if (!minimal && json)
+          'text': {
+            'format': {'type': 'json_object'},
+          },
+        if (!minimal && json) 'temperature': 0.3,
+      };
+    }
+    return {
       'model': model,
-      'max_tokens': 4,
       'messages': [
-        {'role': 'user', 'content': 'Reply only with OK'},
+        if (system != null) {'role': 'system', 'content': system},
+        {'role': 'user', 'content': user},
       ],
-      if (disableThinking) 'thinking': {'type': 'disabled'},
-    });
+      if (!minimal && json) 'temperature': 0.3,
+      if (!minimal && json) 'response_format': {'type': 'json_object'},
+      if (!minimal && disableThinking) 'thinking': {'type': 'disabled'},
+    };
+  }
+
+  /// The text of a chat completion or a Responses API reply.
+  static String replyText(LlmApi api, dynamic data) {
+    if (data is! Map) {
+      throw const FormatException('reply is not a JSON object');
+    }
+    if (data['error'] != null) {
+      throw FormatException('${data['error']}');
+    }
+    if (api == LlmApi.responses) {
+      if (data['output_text'] is String) {
+        return data['output_text'] as String;
+      }
+      final StringBuffer text = StringBuffer();
+      for (final dynamic item in (data['output'] as List? ?? const [])) {
+        if (item is Map && item['type'] == 'message') {
+          for (final dynamic part in (item['content'] as List? ?? const [])) {
+            if (part is Map && part['text'] is String) {
+              text.write(part['text']);
+            }
+          }
+        }
+      }
+      return text.toString();
+    }
+    final dynamic content = data['choices'][0]['message']['content'];
+    if (content is List) {
+      return content.map((p) => p is Map ? (p['text'] ?? '') : '$p').join();
+    }
+    return (content ?? '') as String;
   }
 
   /// Parses the model reply, tolerating code fences or text around the JSON.
@@ -117,12 +217,53 @@ Reply with JSON only, in exactly this form: {"translations":[{"id":<id>,"text":"
     }
     return result;
   }
+}
 
-  static String _trimSlash(String url) {
-    String result = url.trim();
-    while (result.endsWith('/')) {
-      result = result.substring(0, result.length - 1);
+enum LlmApi { chat, responses }
+
+class LlmEndpoint {
+  final String url;
+  final LlmApi api;
+
+  const LlmEndpoint(this.url, this.api);
+
+  @override
+  bool operator ==(Object other) => other is LlmEndpoint && other.url == url && other.api == api;
+
+  @override
+  int get hashCode => Object.hash(url, api);
+
+  @override
+  String toString() => '${api.name} $url';
+}
+
+/// A failed API call, with the URL, the HTTP status and the API's own message.
+class LlmApiException implements Exception {
+  final String url;
+  final int? status;
+  final String message;
+
+  LlmApiException(this.url, this.status, this.message);
+
+  factory LlmApiException.fromDio(String url, DioException e) {
+    final int? status = e.response?.statusCode;
+    if (status == null) {
+      return LlmApiException(url, null, '${e.type.name}: ${e.message ?? e.error ?? ''}');
     }
-    return result;
+    final dynamic data = e.response?.data;
+    String detail = '';
+    if (data is Map && data['error'] != null) {
+      final dynamic error = data['error'];
+      detail = error is Map ? '${error['message'] ?? error}' : '$error';
+    } else if (data != null) {
+      detail = data is String ? data : jsonEncode(data);
+    }
+    if (detail.length > 300) {
+      detail = '${detail.substring(0, 300)}…';
+    }
+    return LlmApiException(url, status, detail);
   }
+
+  @override
+  String toString() => status == null ? '$message\n$url' : 'HTTP $status $message\n$url';
 }

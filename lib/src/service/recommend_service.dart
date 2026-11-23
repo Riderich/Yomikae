@@ -7,10 +7,12 @@ import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/extension/get_logic_extension.dart';
 import 'package:jhentai/src/model/gallery.dart';
 import 'package:jhentai/src/model/gallery_metadata.dart';
+import 'package:jhentai/src/model/gallery_tag.dart';
 import 'package:jhentai/src/model/gallery_page.dart';
 import 'package:jhentai/src/model/search_config.dart';
 import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/service/path_service.dart';
+import 'package:jhentai/src/service/recommend_feedback.dart';
 import 'package:jhentai/src/service/tag_translation_service.dart';
 import 'package:jhentai/src/service/taste_service.dart';
 import 'package:jhentai/src/utils/eh_spider_parser.dart';
@@ -34,7 +36,11 @@ class Recommendation {
   final List<String> styles;
   final String? language;
 
-  Recommendation({required this.time, required this.galleries, required this.artists, required this.seeds, required this.styles, this.language});
+  /// gid -> `namespace:key` tags of [galleries], for feedback.
+  final Map<int, List<String>> tags;
+
+  Recommendation({required this.time, required this.galleries, required this.artists, required this.seeds, required this.styles, this.language, Map<int, List<String>>? tags})
+      : tags = tags ?? {};
 
   Map<String, dynamic> toJson() => {
         'time': time.millisecondsSinceEpoch,
@@ -43,6 +49,7 @@ class Recommendation {
         'seeds': seeds,
         'styles': styles,
         'language': language,
+        'tags': tags.map((gid, t) => MapEntry('$gid', t)),
       };
 
   factory Recommendation.fromJson(Map json) => Recommendation(
@@ -52,6 +59,7 @@ class Recommendation {
         seeds: (json['seeds'] as List).cast<String>(),
         styles: ((json['styles'] as List?) ?? []).cast<String>(),
         language: json['language'],
+        tags: {for (MapEntry e in ((json['tags'] as Map?) ?? const {}).entries) int.parse(e.key): (e.value as List).cast<String>()},
       );
 }
 
@@ -84,6 +92,11 @@ class RecommendService extends GetxController with JHLifeCircleBeanErrorCatch im
   /// `namespace:key` -> translated name, for the tags shown.
   final Map<String, String> labels = {};
 
+  RecommendFeedback feedback = RecommendFeedback();
+
+  /// folder key -> votes given since its last recommendation.
+  final Map<String, int> _newVotes = {};
+
   late final File _cacheFile;
 
   @override
@@ -100,6 +113,9 @@ class RecommendService extends GetxController with JHLifeCircleBeanErrorCatch im
           results[e.key == 'all' ? null : int.parse(e.key)] = Recommendation.fromJson(e.value);
         }
         folder = json['folder'];
+        if (json['feedback'] != null) {
+          feedback = RecommendFeedback.fromJson(json['feedback']);
+        }
       } catch (e) {
         log.warning('Read recommend cache failed', e);
       }
@@ -128,8 +144,78 @@ class RecommendService extends GetxController with JHLifeCircleBeanErrorCatch im
     await _cacheFile.writeAsString(jsonEncode({
       'folder': folder,
       'results': results.map((f, r) => MapEntry(f == null ? 'all' : '$f', r.toJson())),
+      'feedback': feedback.toJson(),
     }));
   }
+
+  // -------------------------------------------------------------- feedback
+
+  /// Votes given in the shown folder since its last recommendation.
+  int get newVotes => _newVotes[RecommendFeedback.keyOf(folder)] ?? 0;
+
+  int tagVote(String tag) => feedback.tagVote(folder, tag);
+
+  int galleryVote(int gid) => feedback.galleryVote(folder, gid);
+
+  /// The tags of a recommended gallery: from its metadata when known.
+  List<String> tagsOf(Gallery gallery) {
+    for (Recommendation r in results.values) {
+      final List<String>? tags = r.tags[gallery.gid];
+      if (tags != null) {
+        return tags;
+      }
+    }
+    return [
+      for (List<GalleryTag> tags in gallery.tags.values)
+        for (GalleryTag t in tags) '${t.tagData.namespace}:${t.tagData.key}'
+    ];
+  }
+
+  void voteTag(String tag, int vote) {
+    feedback.voteTag(folder, tag, vote);
+    _voted();
+  }
+
+  /// A disliked gallery leaves the shown list; returns where it was so that
+  /// [undoDislike] can put it back.
+  int voteGallery(Gallery gallery, int vote) {
+    feedback.voteGallery(folder, gallery.gid, tagsOf(gallery), vote);
+    int index = -1;
+    if (vote < 0) {
+      index = current?.galleries.indexWhere((g) => g.gid == gallery.gid) ?? -1;
+      if (index >= 0) {
+        current!.galleries.removeAt(index);
+      }
+    }
+    _voted();
+    return index;
+  }
+
+  void undoDislike(Gallery gallery, int index) {
+    feedback.voteGallery(folder, gallery.gid, const [], 0);
+    final Recommendation? r = current;
+    if (index >= 0 && r != null && !r.galleries.any((g) => g.gid == gallery.gid)) {
+      r.galleries.insert(math.min(index, r.galleries.length), gallery);
+    }
+    _voted();
+  }
+
+  void clearFeedback() {
+    feedback.clear();
+    _newVotes.clear();
+    updateSafely([stateId]);
+    _saveCache().catchError((_) {});
+  }
+
+  void _voted() {
+    final String key = RecommendFeedback.keyOf(folder);
+    _newVotes[key] = (_newVotes[key] ?? 0) + 1;
+    updateSafely([stateId]);
+    _saveCache().catchError((_) {});
+  }
+
+  /// Translated names for tags shown outside the recommendation itself.
+  Future<void> translateTags(Iterable<String> tags) => _translate(extra: tags);
 
   /// Searches and ranks recommendations for [folder] (null = all favourites).
   Future<void> recommend(int? folder) async {
@@ -146,8 +232,8 @@ class RecommendService extends GetxController with JHLifeCircleBeanErrorCatch im
 
     try {
       final Map<String, int> siteCounts = tasteService.siteCounts;
-      final Map<String, double> profile = TasteService.profileOf(favorites, siteCounts);
-      final List<String> seeds = TasteService.seedTags(profile, siteCounts);
+      final Map<String, double> profile = feedback.adjustProfile(folder, TasteService.profileOf(favorites, siteCounts), siteCounts);
+      final List<String> seeds = feedback.adjustSeeds(folder, TasteService.seedTags(profile, siteCounts, count: 8), siteCounts);
       final String? language = TasteService.dominantLanguage(favorites);
       final List<String> styles = TasteService.styleTermsOf(favorites);
       final Set<String> categories = TasteService.categoriesOf(favorites);
@@ -159,13 +245,20 @@ class RecommendService extends GetxController with JHLifeCircleBeanErrorCatch im
       progressTotal = queries.length + (TasteService.maxRecallGalleries / 25).ceil();
       updateSafely([stateId]);
 
-      // recall
+      // recall, each search continuing where the last round left off
       final Map<int, Gallery> found = {};
+      final Map<String, String> cursors = feedback.cursors[RecommendFeedback.keyOf(folder)] ??= {};
       for (String query in queries) {
         GalleryPageInfo page = await TasteService.withRetry(() => ehRequest.requestGalleryPage<GalleryPageInfo>(
+              nextGid: cursors[query],
               searchConfig: _searchConfig(query, categories),
               parser: EHSpiderParser.galleryPage2GalleryPageInfo,
             ));
+        if (page.nextGid == null) {
+          cursors.remove(query);
+        } else {
+          cursors[query] = page.nextGid!;
+        }
         for (Gallery g in page.galleries) {
           if (!tasteService.galleries.containsKey(g.gid) && found.length < TasteService.maxRecallGalleries) {
             found.putIfAbsent(g.gid, () => g);
@@ -190,15 +283,27 @@ class RecommendService extends GetxController with JHLifeCircleBeanErrorCatch im
       }
 
       // rank
-      final List<(int, double)> ranked = TasteService.rankGalleries(rated, profile, siteCounts);
+      final List<(int, double)> ranked = feedback.rank(folder, rated, profile, siteCounts);
+      final List<int> kept = ranked.take(maxGalleries).map((r) => r.$1).toList();
+      final Map<int, List<String>> tagsByGid = {for ((TasteGallery, double) r in rated) r.$1.gid: r.$1.tags};
+      final Set<String> knownArtists = {
+        ...TasteService.knownArtists(tasteService.galleries.values),
+        ...feedback.likedTagsOf(folder),
+        ...feedback.dislikedTags,
+      };
+      final List<(TasteGallery, double)> artistCandidates =
+          rated.where((r) => !feedback.dislikedGalleries.containsKey(r.$1.gid) && !r.$1.tags.any(feedback.dislikedTags.contains)).toList();
       results[folder] = Recommendation(
         time: DateTime.now(),
-        galleries: ranked.take(maxGalleries).map((r) => found[r.$1]!).toList(),
-        artists: TasteService.recommend(rated, profile, TasteService.knownArtists(tasteService.galleries.values), siteCounts, limit: maxArtists),
+        galleries: kept.map((gid) => found[gid]!).toList(),
+        artists: TasteService.recommend(artistCandidates, profile, knownArtists, siteCounts, limit: maxArtists),
         seeds: seeds,
         styles: styles,
         language: language,
+        tags: {for (int gid in kept) gid: tagsByGid[gid] ?? const []},
       );
+      feedback.addShown(folder, kept);
+      _newVotes.remove(RecommendFeedback.keyOf(folder));
       await _saveCache();
       await _translate();
     } catch (e, stack) {
@@ -230,10 +335,13 @@ class RecommendService extends GetxController with JHLifeCircleBeanErrorCatch im
   }
 
   /// Translated names of the seed tags and artists, when the database is installed.
-  Future<void> _translate() async {
+  Future<void> _translate({Iterable<String> extra = const []}) async {
     final List<String> tags = {
-      for (Recommendation r in results.values) ...[...r.seeds, ...r.styles, ...r.artists.map((a) => '${a.namespace}:${a.key}')]
-    }.toList();
+      for (Recommendation r in results.values) ...[...r.seeds, ...r.styles, ...r.artists.map((a) => '${a.namespace}:${a.key}')],
+      ...feedback.dislikedTags,
+      for (Set<String> liked in feedback.likedTags.values) ...liked,
+      ...extra,
+    }.where((t) => t.contains(':') && !labels.containsKey(t)).toList();
     if (tags.isEmpty) {
       return;
     }

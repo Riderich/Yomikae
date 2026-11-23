@@ -101,13 +101,29 @@ class _SettingTranslationPageState extends State<SettingTranslationPage> {
   Future<void> testConnection() async {
     await save();
     setState(() => testing = true);
-    final bool success = onDevice ? await _testLlm() : await imageTranslationService.testConnection();
+    if (onDevice) {
+      final String? error = await _testLlm();
+      if (!mounted) {
+        return;
+      }
+      setState(() => testing = false);
+      if (error == null) {
+        toast('translationLlmConnected'.tr, isShort: false);
+      } else {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('translationLlmUnavailable'.tr),
+            content: SelectableText(error),
+            actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text('OK'.tr))],
+          ),
+        );
+      }
+      return;
+    }
+    final bool success = await imageTranslationService.testConnection();
     if (mounted) {
       setState(() => testing = false);
-    }
-    if (onDevice) {
-      toast(success ? 'translationLlmConnected'.tr : 'translationLlmUnavailable'.tr, isShort: false);
-      return;
     }
     toast(
       success
@@ -117,7 +133,8 @@ class _SettingTranslationPageState extends State<SettingTranslationPage> {
     );
   }
 
-  Future<bool> _testLlm() async {
+  /// null when the API answered, else what went wrong.
+  Future<String?> _testLlm() async {
     try {
       await LlmPageTranslator(
         baseUrl: translationSetting.apiBaseUrl.value,
@@ -126,9 +143,9 @@ class _SettingTranslationPageState extends State<SettingTranslationPage> {
         disableThinking: translationSetting.disableThinking.value,
         timeout: const Duration(seconds: 30),
       ).ping();
-      return true;
-    } catch (_) {
-      return false;
+      return null;
+    } catch (e) {
+      return e.toString();
     }
   }
 

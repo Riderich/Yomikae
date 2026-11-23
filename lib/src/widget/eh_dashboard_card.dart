@@ -15,8 +15,9 @@ import '../utils/route_util.dart';
 class EHDashboardCard extends StatefulWidget {
   final Gallery gallery;
   final String? badge;
+  final VoidCallback? onLongPress;
 
-  const EHDashboardCard({Key? key, required this.gallery, this.badge}) : super(key: key);
+  const EHDashboardCard({Key? key, required this.gallery, this.badge, this.onLongPress}) : super(key: key);
 
   @override
   State<EHDashboardCard> createState() => _EHDashboardCardState();
@@ -35,6 +36,7 @@ class _EHDashboardCardState extends State<EHDashboardCard> {
           Routes.details,
           arguments: DetailsPageArgument(galleryUrl: widget.gallery.galleryUrl, gallery: widget.gallery),
         ),
+        onLongPress: widget.onLongPress,
 
         /// show info after image load success
         child: Stack(

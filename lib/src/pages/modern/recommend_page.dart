@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:jhentai/src/model/gallery.dart';
 import 'package:jhentai/src/pages/details/details_page_logic.dart';
 import 'package:jhentai/src/pages/modern/favorite_folder_chips.dart';
+import 'package:jhentai/src/pages/modern/recommend_feedback_sheet.dart';
 import 'package:jhentai/src/routes/routes.dart';
 import 'package:jhentai/src/service/follow_service.dart';
 import 'package:jhentai/src/service/recommend_service.dart';
@@ -122,14 +123,15 @@ class _RecommendPageState extends State<RecommendPage> {
                     trailing: FilledButton(onPressed: () => recommendService.recommend(recommendService.folder), child: Text('recommendStart'.tr)),
                   ),
                 ),
+              if (recommendService.newVotes > 0 && !recommendService.running) _buildPendingFeedback(context),
               if (r != null) ...[
                 const SizedBox(height: 8),
-                Text(_basis(r), style: text.bodySmall),
+                _buildBasis(context, r),
                 if (r.artists.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   _title(context, Icons.brush_outlined, 'recommendArtists'.tr),
                   const SizedBox(height: 8),
-                  _buildArtists(r),
+                  _buildArtists(context, r),
                 ],
                 const SizedBox(height: 20),
                 _title(context, Icons.collections_bookmark_outlined, 'recommendGalleries'.tr),
@@ -146,6 +148,12 @@ class _RecommendPageState extends State<RecommendPage> {
             listMode: styleSetting.listMode.value,
             loadingState: LoadingState.success,
             handleTapCard: (Gallery gallery) => toRoute(Routes.details, arguments: DetailsPageArgument(galleryUrl: gallery.galleryUrl, gallery: gallery)),
+            handleLongPressCard: (Gallery gallery, _) => RecommendFeedbackSheet.showForGallery(context, gallery),
+          ),
+        if (!recommendService.feedback.isEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+            sliver: SliverToBoxAdapter(child: _buildFeedbackSummary(context)),
           ),
         if (r != null)
           SliverPadding(
@@ -162,14 +170,93 @@ class _RecommendPageState extends State<RecommendPage> {
     );
   }
 
-  /// "Based on: glasses · ponytail · ... | chinese"
-  String _basis(Recommendation r) {
-    final List<String> parts = [
-      r.seeds.map(recommendService.label).join(' · '),
+  /// "Based on: [glasses] [ponytail] ... 3d | chinese", the tags can be
+  /// searched (tap) and rated (long press).
+  Widget _buildBasis(BuildContext context, Recommendation r) {
+    final TextStyle? small = Theme.of(context).textTheme.bodySmall;
+    final List<String> extra = [
       ...r.styles.map(recommendService.label),
       if (r.language != null) recommendService.label('language:${r.language}'),
     ];
-    return 'recommendBasis'.trParams({'basis': parts.where((p) => p.isNotEmpty).join('  |  ')});
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(extra.isEmpty ? 'recommendBasis'.tr : '${'recommendBasis'.tr}  ·  ${'recommendLimit'.trParams({'limit': extra.join(' · ')})}', style: small),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: r.seeds.map((tag) => _tagChip(context, tag)).toList(),
+        ),
+        const SizedBox(height: 6),
+        Text('recommendFeedbackHint'.tr, style: small?.copyWith(color: Theme.of(context).colorScheme.outline)),
+      ],
+    );
+  }
+
+  Widget _tagChip(BuildContext context, String tag, {VoidCallback? onDeleted}) {
+    final int vote = recommendService.tagVote(tag);
+    return GestureDetector(
+      onLongPress: () => RecommendFeedbackSheet.showForTag(context, tag),
+      child: InputChip(
+        visualDensity: VisualDensity.compact,
+        avatar: vote == 0 ? null : RecommendFeedbackSheet.voteIcon(vote),
+        label: Text(recommendService.label(tag)),
+        tooltip: tag,
+        onPressed: () => RecommendFeedbackSheet.showForTag(context, tag),
+        onDeleted: onDeleted,
+      ),
+    );
+  }
+
+  Widget _buildPendingFeedback(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.how_to_vote_outlined),
+        title: Text('recommendFeedbackPending'.trParams({'count': '${recommendService.newVotes}'})),
+        trailing: FilledButton(onPressed: () => recommendService.recommend(recommendService.folder), child: Text('refresh'.tr)),
+      ),
+    );
+  }
+
+  /// Everything rated so far; a chip's x forgets that vote.
+  Widget _buildFeedbackSummary(BuildContext context) {
+    final int? folder = recommendService.folder;
+    final List<String> liked = recommendService.feedback.likedTagsOf(folder).toList()..sort();
+    final List<String> disliked = recommendService.feedback.dislikedTags.toList()..sort();
+    final int likedWorks = recommendService.feedback.likedGalleriesOf(folder).length;
+    final int dislikedWorks = recommendService.feedback.dislikedGalleries.length;
+    final TextStyle? small = Theme.of(context).textTheme.bodySmall;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(child: _title(context, Icons.how_to_vote_outlined, 'recommendYourFeedback'.tr)),
+            TextButton(onPressed: recommendService.clearFeedback, child: Text('recommendClearFeedback'.tr)),
+          ],
+        ),
+        if (likedWorks > 0 || dislikedWorks > 0)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              [
+                if (likedWorks > 0) 'recommendLikedWorks'.trParams({'count': '$likedWorks'}),
+                if (dislikedWorks > 0) 'recommendDislikedWorks'.trParams({'count': '$dislikedWorks'}),
+              ].join(' · '),
+              style: small,
+            ),
+          ),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            ...liked.map((tag) => _tagChip(context, tag, onDeleted: () => recommendService.voteTag(tag, 0))),
+            ...disliked.map((tag) => _tagChip(context, tag, onDeleted: () => recommendService.voteTag(tag, 0))),
+          ],
+        ),
+      ],
+    );
   }
 
   Widget _title(BuildContext context, IconData icon, String title) {
@@ -182,7 +269,7 @@ class _RecommendPageState extends State<RecommendPage> {
     );
   }
 
-  Widget _buildArtists(Recommendation r) {
+  Widget _buildArtists(BuildContext context, Recommendation r) {
     return GetBuilder<FollowService>(
       id: FollowService.entriesId,
       builder: (_) => Wrap(
@@ -190,13 +277,18 @@ class _RecommendPageState extends State<RecommendPage> {
         runSpacing: 8,
         children: r.artists.map((item) {
           final bool following = followService.isFollowing(item.namespace, item.key);
-          return InputChip(
-            label: Text(item.displayName),
-            tooltip: item.displayName == item.key ? null : '${item.namespace}:${item.key}',
-            onPressed: () => newSearch(keyword: item.keyword, forceNewRoute: true),
-            deleteIcon: Icon(following ? Icons.star : Icons.star_border, size: 18, color: following ? Colors.amber : null),
-            deleteButtonTooltipMessage: following ? 'unfollow'.tr : 'follow'.tr,
-            onDeleted: () => followService.toggle(item.namespace, item.key, label: item.label),
+          final int vote = recommendService.tagVote('${item.namespace}:${item.key}');
+          return GestureDetector(
+            onLongPress: () => RecommendFeedbackSheet.showForTag(context, '${item.namespace}:${item.key}', keyword: item.keyword),
+            child: InputChip(
+              avatar: vote == 0 ? null : RecommendFeedbackSheet.voteIcon(vote),
+              label: Text(item.displayName),
+              tooltip: item.displayName == item.key ? null : '${item.namespace}:${item.key}',
+              onPressed: () => newSearch(keyword: item.keyword, forceNewRoute: true),
+              deleteIcon: Icon(following ? Icons.star : Icons.star_border, size: 18, color: following ? Colors.amber : null),
+              deleteButtonTooltipMessage: following ? 'unfollow'.tr : 'follow'.tr,
+              onDeleted: () => followService.toggle(item.namespace, item.key, label: item.label),
+            ),
           );
         }).toList(),
       ),
