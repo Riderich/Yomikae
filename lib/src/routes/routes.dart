@@ -57,6 +57,7 @@ import '../pages/setting/style/page_list_style/setting_page_list_style_page.dart
 import '../pages/setting/style/theme_color/setting_theme_color_page.dart';
 import '../pages/single_image/single_image.dart';
 import '../pages/modern/tag_browser_page.dart';
+import '../pages/modern/recommend_page.dart';
 import 'eh_page.dart';
 
 class Routes {
@@ -82,6 +83,7 @@ class Routes {
   static const String desktopSearch = "/desktop_search";
   static const String mobileV2Search = "/mobile_v2_search";
   static const String tagBrowser = "/tag_browser";
+  static const String recommend = "/recommend";
   static const String downloadSearch = "/download_search";
 
   /// right
@@ -269,6 +271,12 @@ class Routes {
     EHPage(
       name: tagBrowser,
       page: () => const TagBrowserPage(),
+      transition: defaultTransition,
+      side: Side.left,
+    ),
+    EHPage(
+      name: recommend,
+      page: () => const RecommendPage(),
       transition: defaultTransition,
       side: Side.left,
     ),

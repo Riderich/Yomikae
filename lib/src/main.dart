@@ -29,6 +29,7 @@ import 'package:jhentai/src/service/path_service.dart';
 import 'package:jhentai/src/service/quick_search_service.dart';
 import 'package:jhentai/src/service/follow_service.dart';
 import 'package:jhentai/src/service/taste_service.dart';
+import 'package:jhentai/src/service/recommend_service.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
 import 'package:jhentai/src/service/schedule_service.dart';
 import 'package:jhentai/src/service/search_history_service.dart';
@@ -83,6 +84,7 @@ List<JHLifeCircleBean> lifeCircleBeans = [
   quickSearchService,
   followService,
   tasteService,
+  recommendService,
   scheduleService,
   searchHistoryService,
   storageService,

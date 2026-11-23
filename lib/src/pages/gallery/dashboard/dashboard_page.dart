@@ -64,6 +64,7 @@ class DashboardPage extends BasePage {
             scrollBehavior: UIConfig.scrollBehaviourWithScrollBarWithMouse,
             slivers: [
               buildPullDownIndicator(),
+              ...buildLeadingSlivers(context),
               _buildRanklistDesc(),
               _buildRanklist(),
               _buildPopularListDesc(),
@@ -77,6 +78,9 @@ class DashboardPage extends BasePage {
       ),
     );
   }
+
+  /// Extra sections above the rank list.
+  List<Widget> buildLeadingSlivers(BuildContext context) => const [];
 
   @override
   Widget buildPullDownIndicator() {

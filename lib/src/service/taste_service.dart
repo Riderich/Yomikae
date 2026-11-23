@@ -85,9 +85,9 @@ class TasteItem {
 }
 
 /// A section of the taste page.
-enum TasteSection { artist, recommended, group, uploader, parody, character, tag }
+enum TasteSection { artist, group, uploader, parody, character, tag }
 
-enum TasteRefreshPhase { idle, listing, fetching, recommending }
+enum TasteRefreshPhase { idle, listing, fetching }
 
 /// Collects the tags, artists, circles and uploaders of all favourited
 /// galleries (favourites list + EH `gdata` API, 25 galleries per request) and
@@ -99,9 +99,12 @@ enum TasteRefreshPhase { idle, listing, fetching, recommending }
 /// * an artist / circle ranks by favourites (time-decayed) x how much of their
 ///   work the user favourited (smoothed hit rate) x how close their tags are to
 ///   the profile (cosine similarity);
-/// * recommendations: recall galleries by searching the profile's most
-///   characteristic tag pairs, then rank the unknown artists in them by
-///   similarity to the profile and rating.
+/// * recommendations (see RecommendService): recall galleries by searching the
+///   profile's most characteristic tag pairs, then rank them and their unknown
+///   artists by similarity to the profile and rating.
+///
+/// Users often sort favourites into folders by style, so every analysis can
+/// be limited to one favourites folder.
 ///
 /// The collected data is cached in a JSON file; a refresh only fetches the
 /// metadata of galleries not seen before.
@@ -169,11 +172,16 @@ class TasteService extends GetxController with JHLifeCircleBeanErrorCatch implem
 
   /// gids in the order of the favourites list (newest first).
   List<int> order = [];
+
+  /// gid -> favourites folder (0-9).
+  Map<int, int> folders = {};
   DateTime? updateTime;
 
-  /// Artists not in the favourites whose work is close to the user's taste.
-  List<TasteItem> recommended = [];
-  DateTime? recommendTime;
+  /// The favourites folder the taste page shows, null for all.
+  int? folder;
+
+  /// `namespace:key` -> galleries on the site, for the tags of the favourites.
+  Map<String, int> siteCounts = {};
 
   TasteRefreshPhase phase = TasteRefreshPhase.idle;
   int progressDone = 0;
@@ -197,8 +205,7 @@ class TasteService extends GetxController with JHLifeCircleBeanErrorCatch implem
         galleries = {for (var g in (json['galleries'] as List).map((e) => TasteGallery.fromJson(e))) g.gid: g};
         order = (json['order'] as List?)?.cast<int>() ?? [];
         updateTime = json['updateTime'] == null ? null : DateTime.fromMillisecondsSinceEpoch(json['updateTime']);
-        recommended = (json['recommended'] as List?)?.map((e) => TasteItem.fromJson(e)).toList() ?? [];
-        recommendTime = json['recommendTime'] == null ? null : DateTime.fromMillisecondsSinceEpoch(json['recommendTime']);
+        folders = {for (MapEntry e in ((json['folders'] as Map?) ?? {}).entries) int.parse(e.key): e.value as int};
       } catch (e) {
         log.warning('Read taste cache failed', e);
       }
@@ -208,7 +215,8 @@ class TasteService extends GetxController with JHLifeCircleBeanErrorCatch implem
   @override
   Future<void> doAfterBeanReady() async {
     if (galleries.isNotEmpty) {
-      await _computeSections(await _loadSiteCounts());
+      siteCounts = await _loadSiteCounts();
+      await _computeSections();
     }
   }
 
@@ -228,19 +236,50 @@ class TasteService extends GetxController with JHLifeCircleBeanErrorCatch implem
     return list;
   }
 
+  /// The favourites of [folder] (all for null), newest first.
+  List<TasteGallery> galleriesOf(int? folder) {
+    final List<TasteGallery> all = orderedGalleries;
+    return folder == null ? all : all.where((g) => folders[g.gid] == folder).toList();
+  }
+
+  /// folder -> number of analysed favourites in it.
+  Map<int, int> get folderCounts {
+    final Map<int, int> counts = {};
+    for (int gid in galleries.keys) {
+      final int? f = folders[gid];
+      if (f != null) {
+        counts[f] = (counts[f] ?? 0) + 1;
+      }
+    }
+    return Map.fromEntries(counts.entries.toList()..sort((a, b) => a.key.compareTo(b.key)));
+  }
+
+  Future<void> selectFolder(int? folder) async {
+    this.folder = folder;
+    updateSafely([stateId]);
+    await _computeSections();
+  }
+
+  /// The favourites folder of a gallery in the favourites list.
+  static int? folderOf(Gallery gallery) {
+    if (gallery.favoriteTagIndex != null || testSource.isEmpty) {
+      return gallery.favoriteTagIndex;
+    }
+    // test builds read a public search: fake folders by category
+    return switch (gallery.category) { 'Doujinshi' => 0, 'Manga' => 1, _ => 2 };
+  }
+
   Future<void> _saveCache() async {
     await _cacheFile.parent.create(recursive: true);
     await _cacheFile.writeAsString(jsonEncode({
       'updateTime': updateTime?.millisecondsSinceEpoch,
       'order': order,
+      'folders': folders.map((gid, f) => MapEntry('$gid', f)),
       'galleries': galleries.values.map((g) => g.toJson()).toList(),
-      'recommendTime': recommendTime?.millisecondsSinceEpoch,
-      'recommended': recommended.map((i) => i.toJson()).toList(),
     }));
   }
 
-  /// Lists all favourites, fetches the metadata of the new ones, then looks
-  /// for artists with similar work.
+  /// Lists all favourites and fetches the metadata of the new ones.
   Future<void> analyze() async {
     if (refreshing) {
       return;
@@ -257,7 +296,7 @@ class TasteService extends GetxController with JHLifeCircleBeanErrorCatch implem
       String? nextGid;
       do {
         final String? next = nextGid;
-        GalleryPageInfo page = await _withRetry(() => ehRequest.requestGalleryPage<GalleryPageInfo>(
+        GalleryPageInfo page = await withRetry(() => ehRequest.requestGalleryPage<GalleryPageInfo>(
               searchConfig: testSource.isEmpty ? SearchConfig(searchType: SearchType.favorite) : SearchConfig(keyword: testSource),
               nextGid: next,
               parser: EHSpiderParser.galleryPage2GalleryPageInfo,
@@ -276,6 +315,13 @@ class TasteService extends GetxController with JHLifeCircleBeanErrorCatch implem
       // 2. metadata of galleries not cached yet
       galleries.removeWhere((gid, _) => !favorites.containsKey(gid));
       order = favorites.keys.toList();
+      folders = {
+        for (Gallery g in favorites.values)
+          if (folderOf(g) != null) g.gid: folderOf(g)!
+      };
+      if (folder != null && !folders.containsValue(folder)) {
+        folder = null;
+      }
       final List<Gallery> missing = favorites.values.where((g) => !galleries.containsKey(g.gid)).toList();
       phase = TasteRefreshPhase.fetching;
       progressDone = 0;
@@ -284,7 +330,7 @@ class TasteService extends GetxController with JHLifeCircleBeanErrorCatch implem
 
       for (int i = 0; i < missing.length; i += 25) {
         final List<Gallery> batch = missing.sublist(i, math.min(missing.length, i + 25));
-        List<GalleryMetadata> metadatas = await _fetchMetadata(batch);
+        List<GalleryMetadata> metadatas = await fetchMetadata(batch);
         for (GalleryMetadata m in metadatas) {
           galleries[m.galleryUrl.gid] = TasteGallery.fromMetadata(m);
         }
@@ -295,17 +341,8 @@ class TasteService extends GetxController with JHLifeCircleBeanErrorCatch implem
 
       updateTime = DateTime.now();
       await _saveCache();
-      final Map<String, int> siteCounts = await _loadSiteCounts();
-      await _computeSections(siteCounts);
-
-      // 3. artists with similar work; a failure here keeps the analysis
-      try {
-        await _findRecommendations(siteCounts);
-        await _saveCache();
-        await _computeSections(siteCounts);
-      } catch (e, stack) {
-        log.error('Find taste recommendations failed', e, stack);
-      }
+      siteCounts = await _loadSiteCounts();
+      await _computeSections();
     } catch (e, stack) {
       log.error('Refresh taste failed', e, stack);
       error = e.toString();
@@ -317,58 +354,12 @@ class TasteService extends GetxController with JHLifeCircleBeanErrorCatch implem
     }
   }
 
-  Future<List<GalleryMetadata>> _fetchMetadata(List<Gallery> batch) {
-    return _withRetry(() => ehRequest.requestGalleryMetadatas<List<GalleryMetadata>>(
+  /// `gdata` for up to 25 galleries.
+  static Future<List<GalleryMetadata>> fetchMetadata(List<Gallery> batch) {
+    return withRetry(() => ehRequest.requestGalleryMetadatas<List<GalleryMetadata>>(
           list: batch.map((g) => (gid: g.gid, token: g.token)).toList(),
           parser: EHSpiderParser.galleryMetadataJson2GalleryMetadatas,
         ));
-  }
-
-  /// Recall: search the profile's characteristic tag pairs. Rank: the unknown
-  /// artists in the results, by similarity to the profile.
-  Future<void> _findRecommendations(Map<String, int> siteCounts) async {
-    final List<TasteGallery> favorites = orderedGalleries;
-    final Map<String, double> profile = profileOf(favorites, siteCounts);
-    final List<String> queries = recallQueries(seedTags(profile, siteCounts), dominantLanguage(favorites));
-    if (queries.isEmpty) {
-      return;
-    }
-
-    phase = TasteRefreshPhase.recommending;
-    progressDone = 0;
-    progressTotal = queries.length + (maxRecallGalleries / 25).ceil();
-    updateSafely([stateId]);
-
-    final Map<int, Gallery> found = {};
-    for (String query in queries) {
-      GalleryPageInfo page = await _withRetry(() => ehRequest.requestGalleryPage<GalleryPageInfo>(
-            searchConfig: SearchConfig(keyword: query, minimumRating: 4),
-            parser: EHSpiderParser.galleryPage2GalleryPageInfo,
-          ));
-      for (Gallery g in page.galleries) {
-        if (!galleries.containsKey(g.gid) && found.length < maxRecallGalleries) {
-          found[g.gid] = g;
-        }
-      }
-      progressDone++;
-      updateSafely([stateId]);
-      await Future.delayed(const Duration(milliseconds: 600));
-    }
-
-    final List<Gallery> candidates = found.values.toList();
-    progressTotal = queries.length + (candidates.length / 25).ceil();
-    final List<(TasteGallery, double)> rated = [];
-    for (int i = 0; i < candidates.length; i += 25) {
-      for (GalleryMetadata m in await _fetchMetadata(candidates.sublist(i, math.min(candidates.length, i + 25)))) {
-        rated.add((TasteGallery.fromMetadata(m), m.rating));
-      }
-      progressDone++;
-      updateSafely([stateId]);
-      await Future.delayed(const Duration(milliseconds: 700));
-    }
-
-    recommended = recommend(rated, profile, knownArtists(favorites), siteCounts);
-    recommendTime = DateTime.now();
   }
 
   // ---------------------------------------------------------------- scoring
@@ -526,15 +517,41 @@ class TasteService extends GetxController with JHLifeCircleBeanErrorCatch implem
     return top.value * 2 >= favorites.length ? top.key : null;
   }
 
+  /// Tags marking a drawing style rather than content: when most of a folder
+  /// has one, every search for it requires it.
+  static const List<String> styleTags = ['other:3d', 'other:webtoon', 'other:ai generated'];
+
+  static List<String> styleTermsOf(List<TasteGallery> favorites) {
+    return styleTags.where((tag) => favorites.where((g) => g.tags.contains(tag)).length * 2 > favorites.length).toList();
+  }
+
+  /// Categories making up at least a tenth of [favorites]; searches skip the others.
+  static Set<String> categoriesOf(List<TasteGallery> favorites) {
+    final Map<String, int> counts = {};
+    for (TasteGallery g in favorites) {
+      counts[g.category] = (counts[g.category] ?? 0) + 1;
+    }
+    return {
+      for (MapEntry<String, int> e in counts.entries)
+        if (e.key.isNotEmpty && e.value * 10 >= favorites.length) e.key
+    };
+  }
+
+  static String searchTerm(String tag) {
+    final int colon = tag.indexOf(':');
+    return '${tag.substring(0, colon)}:"${tag.substring(colon + 1)}\$"';
+  }
+
   /// Searches combining two seed tags each: specific enough to match the
   /// taste, broad enough to find artists the user does not know yet.
-  static List<String> recallQueries(List<String> seeds, String? language) {
-    String term(String tag) {
-      final int colon = tag.indexOf(':');
-      return '${tag.substring(0, colon)}:"${tag.substring(colon + 1)}\$"';
-    }
+  /// [required] tags (the folder's style) go into every search.
+  static List<String> recallQueries(List<String> seeds, String? language, {List<String> required = const []}) {
+    String term(String tag) => searchTerm(tag);
 
-    final String suffix = language == null ? '' : ' language:"$language\$"';
+    final String suffix = [
+      ...required.map(searchTerm),
+      if (language != null) 'language:"$language\$"',
+    ].map((t) => ' $t').join();
     if (seeds.length == 1) {
       return ['${term(seeds.first)}$suffix'];
     }
@@ -570,10 +587,23 @@ class TasteService extends GetxController with JHLifeCircleBeanErrorCatch implem
     return items.take(limit).toList();
   }
 
+  /// Ranks recalled galleries (gallery, rating) by similarity to [profile],
+  /// scaled by rating; galleries without a shared tag are dropped.
+  static List<(int, double)> rankGalleries(List<(TasteGallery, double)> candidates, Map<String, double> profile, Map<String, int> siteCounts) {
+    final List<(int, double)> ranked = [];
+    for ((TasteGallery, double) c in candidates) {
+      final double similarity = cosine(tagVector([(c.$1, 1)], siteCounts), profile);
+      if (similarity > 0) {
+        ranked.add((c.$1.gid, similarity * (0.6 + 0.2 * (c.$2 - 3)).clamp(0.4, 1.0)));
+      }
+    }
+    return ranked..sort((a, b) => b.$2.compareTo(a.$2));
+  }
+
   // ---------------------------------------------------------------- helpers
 
   /// Network hiccups (TLS resets, timeouts) should not end a long scan.
-  static Future<T> _withRetry<T>(Future<T> Function() request, {int attempts = 3}) async {
+  static Future<T> withRetry<T>(Future<T> Function() request, {int attempts = 3}) async {
     for (int attempt = 1;; attempt++) {
       try {
         return await request();
@@ -589,10 +619,7 @@ class TasteService extends GetxController with JHLifeCircleBeanErrorCatch implem
 
   /// How common each tag is on the site, to favour tags that are typical of *this* collection.
   Future<Map<String, int>> _loadSiteCounts() async {
-    final Set<String> tags = {
-      ...galleries.values.expand((g) => g.tags),
-      ...recommended.map((i) => '${i.namespace}:${i.key}'),
-    };
+    final Set<String> tags = galleries.values.expand((g) => g.tags).toSet();
     final Map<String, int> siteCounts = {};
     try {
       final List<String> keys = tags.toList();
@@ -608,11 +635,9 @@ class TasteService extends GetxController with JHLifeCircleBeanErrorCatch implem
     return siteCounts;
   }
 
-  Future<void> _computeSections(Map<String, int> siteCounts) async {
-    final Map<TasteSection, List<TasteItem>> result = rank(orderedGalleries, siteCounts);
-    // an artist favourited since the last search is no longer a discovery
-    final Set<String> known = knownArtists(galleries.values);
-    result[TasteSection.recommended] = recommended.where((i) => !known.contains('artist:${i.key}')).toList();
+  Future<void> _computeSections() async {
+    final int? folder = this.folder;
+    final Map<TasteSection, List<TasteItem>> result = rank(galleriesOf(folder), siteCounts);
 
     // translated names, when the tag translation database is installed
     try {
@@ -630,6 +655,10 @@ class TasteService extends GetxController with JHLifeCircleBeanErrorCatch implem
       log.warning('Translate taste tags failed', e);
     }
 
+    if (folder != this.folder) {
+      // another folder was picked meanwhile
+      return;
+    }
     sections = result;
     updateSafely([stateId]);
   }

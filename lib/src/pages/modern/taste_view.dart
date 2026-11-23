@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
+import 'package:jhentai/src/pages/modern/favorite_folder_chips.dart';
 import 'package:jhentai/src/routes/routes.dart';
 import 'package:jhentai/src/service/follow_service.dart';
+import 'package:jhentai/src/service/recommend_service.dart';
 import 'package:jhentai/src/service/taste_service.dart';
 import 'package:jhentai/src/setting/user_setting.dart';
 import 'package:jhentai/src/utils/route_util.dart';
@@ -15,7 +17,6 @@ class TasteView extends StatelessWidget {
 
   static const Map<TasteSection, (String, IconData)> _sections = {
     TasteSection.artist: ('tasteArtists', Icons.brush_outlined),
-    TasteSection.recommended: ('tasteRecommended', Icons.auto_awesome_outlined),
     TasteSection.group: ('tasteGroups', Icons.groups_outlined),
     TasteSection.uploader: ('tasteUploaders', Icons.person_outline),
     TasteSection.tag: ('tasteTags', Icons.label_outline),
@@ -25,7 +26,6 @@ class TasteView extends StatelessWidget {
 
   static const Map<TasteSection, String> _hints = {
     TasteSection.artist: 'tasteArtistsHint',
-    TasteSection.recommended: 'tasteRecommendedHint',
   };
 
   /// Sections ranked by plain frequency, where one-off entries are mostly noise.
@@ -53,14 +53,19 @@ class TasteView extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             children: [
+              FavoriteFolderChips(
+                selected: tasteService.folder,
+                counts: tasteService.folderCounts,
+                enabled: !tasteService.refreshing,
+                onSelected: tasteService.selectFolder,
+              ),
               if (tasteService.refreshing) _buildProgress(context),
+              if (!tasteService.refreshing && tasteService.galleries.isNotEmpty) _buildRecommendLink(context),
               if (tasteService.error != null && !tasteService.refreshing)
                 Card(child: ListTile(leading: const Icon(Icons.error_outline), title: Text('tasteFailed'.tr), subtitle: Text(tasteService.error!))),
               for (MapEntry<TasteSection, (String, IconData)> section in _sections.entries)
                 if (tasteService.sections[section.key]?.isNotEmpty ?? false)
-                  _buildSection(context, section.key, section.value.$1.tr, section.value.$2, tasteService.sections[section.key]!)
-                else if (section.key == TasteSection.recommended && tasteService.recommendTime == null && !tasteService.refreshing)
-                  _buildRecommendPrompt(context),
+                  _buildSection(context, section.key, section.value.$1.tr, section.value.$2, tasteService.sections[section.key]!),
               const SizedBox(height: 16),
               if (tasteService.updateTime != null)
                 Text(
@@ -100,7 +105,6 @@ class TasteView extends StatelessWidget {
     final Map<String, String> progress = {'done': '${tasteService.progressDone}', 'total': '${tasteService.progressTotal}'};
     final String text = switch (tasteService.phase) {
       TasteRefreshPhase.listing => 'tasteListing'.trParams({'count': '${tasteService.progressDone}'}),
-      TasteRefreshPhase.recommending => 'tasteRecommending'.trParams(progress),
       _ => 'tasteFetching'.trParams(progress),
     };
     return Card(
@@ -120,16 +124,22 @@ class TasteView extends StatelessWidget {
     );
   }
 
-  /// Caches from before recommendations existed: one refresh fills the section.
-  Widget _buildRecommendPrompt(BuildContext context) {
+  /// Recommendations are their own page; this opens it for the folder shown.
+  Widget _buildRecommendLink(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 20),
+      padding: const EdgeInsets.only(top: 8),
       child: Card(
         child: ListTile(
           leading: const Icon(Icons.auto_awesome_outlined),
-          title: Text('tasteRecommended'.tr),
-          subtitle: Text('tasteRecommendPrompt'.tr),
-          trailing: IconButton(icon: const Icon(Icons.refresh), tooltip: 'refresh'.tr, onPressed: tasteService.analyze),
+          title: Text('recommendForYou'.tr),
+          subtitle: Text(tasteService.folder == null
+              ? 'recommendFromTaste'.tr
+              : 'recommendFromFolder'.trParams({'folder': FavoriteFolderChips.folderName(tasteService.folder!)})),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            recommendService.selectFolder(tasteService.folder);
+            toRoute(Routes.recommend);
+          },
         ),
       ),
     );
@@ -137,7 +147,6 @@ class TasteView extends StatelessWidget {
 
   Widget _buildSection(BuildContext context, TasteSection section, String title, IconData icon, List<TasteItem> items) {
     final String? hint = _hints[section]?.tr;
-    final bool showCount = section != TasteSection.recommended;
     // with enough recurring entries, one-off ones are just noise
     final Iterable<TasteItem> shown =
         _frequencySections.contains(section) && items.where((i) => i.count >= 2).length >= 4 ? items.where((i) => i.count >= 2) : items;
@@ -161,7 +170,7 @@ class TasteView extends StatelessWidget {
             children: shown.take(24).map((item) {
               final bool following = followService.isFollowing(item.namespace, item.key);
               return InputChip(
-                label: Text(showCount ? '${item.displayName}  ${item.count}' : item.displayName),
+                label: Text('${item.displayName}  ${item.count}'),
                 tooltip: item.displayName == item.key ? null : '${item.namespace}:${item.key}',
                 onPressed: () => newSearch(keyword: item.keyword, forceNewRoute: true),
                 deleteIcon: Icon(following ? Icons.star : Icons.star_border, size: 18, color: following ? Colors.amber : null),

@@ -139,6 +139,30 @@ void main() {
       expect(items.first.keyword, r'artist:"close$"');
     });
 
+    test('a folder\'s drawing style and categories narrow every search', () {
+      final List<TasteGallery> folder = [
+        TasteGallery(gid: 1, token: 't', title: '', category: 'Western', tags: ['other:3d', 'female:x']),
+        TasteGallery(gid: 2, token: 't', title: '', category: 'Western', tags: ['other:3d']),
+        TasteGallery(gid: 3, token: 't', title: '', category: 'Artist CG', tags: ['female:x']),
+      ];
+      expect(TasteService.styleTermsOf(folder), ['other:3d']);
+      expect(TasteService.categoriesOf(folder), {'Western', 'Artist CG'});
+      expect(TasteService.recallQueries(['female:x', 'female:y'], 'english', required: ['other:3d']),
+          [r'female:"x$" female:"y$" other:"3d$" language:"english$"']);
+      expect(TasteService.recallQueries([], null, required: ['other:3d']), isEmpty);
+    });
+
+    test('ranks recalled galleries by closeness and rating, drops unrelated ones', () {
+      final Map<String, double> profile = {'female:glasses': 2, 'female:ponytail': 2};
+      final List<(int, double)> ranked = TasteService.rankGalleries([
+        (g(1, ['female:glasses']), 4.5),
+        (g(2, ['female:glasses', 'female:ponytail']), 4.5),
+        (g(3, ['male:a']), 5.0),
+        (g(4, ['female:glasses', 'female:ponytail']), 3.5),
+      ], profile, {});
+      expect(ranked.map((r) => r.$1), [2, 4, 1]);
+    });
+
     test('items survive the cache', () {
       final TasteItem copy = TasteItem.fromJson(TasteItem('artist', 'a', 3, siteCount: 12, score: 1.5).toJson());
       expect((copy.namespace, copy.key, copy.count, copy.siteCount, copy.score), ('artist', 'a', 3, 12, 1.5));
