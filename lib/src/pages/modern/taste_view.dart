@@ -15,12 +15,21 @@ class TasteView extends StatelessWidget {
 
   static const Map<TasteSection, (String, IconData)> _sections = {
     TasteSection.artist: ('tasteArtists', Icons.brush_outlined),
+    TasteSection.recommended: ('tasteRecommended', Icons.auto_awesome_outlined),
     TasteSection.group: ('tasteGroups', Icons.groups_outlined),
     TasteSection.uploader: ('tasteUploaders', Icons.person_outline),
     TasteSection.tag: ('tasteTags', Icons.label_outline),
     TasteSection.parody: ('tasteParodies', Icons.movie_outlined),
     TasteSection.character: ('tasteCharacters', Icons.face_outlined),
   };
+
+  static const Map<TasteSection, String> _hints = {
+    TasteSection.artist: 'tasteArtistsHint',
+    TasteSection.recommended: 'tasteRecommendedHint',
+  };
+
+  /// Sections ranked by plain frequency, where one-off entries are mostly noise.
+  static const Set<TasteSection> _frequencySections = {TasteSection.uploader, TasteSection.parody, TasteSection.character, TasteSection.tag};
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +57,10 @@ class TasteView extends StatelessWidget {
               if (tasteService.error != null && !tasteService.refreshing)
                 Card(child: ListTile(leading: const Icon(Icons.error_outline), title: Text('tasteFailed'.tr), subtitle: Text(tasteService.error!))),
               for (MapEntry<TasteSection, (String, IconData)> section in _sections.entries)
-                if (tasteService.sections[section.key]?.isNotEmpty ?? false) _buildSection(context, section.value.$1.tr, section.value.$2, tasteService.sections[section.key]!),
+                if (tasteService.sections[section.key]?.isNotEmpty ?? false)
+                  _buildSection(context, section.key, section.value.$1.tr, section.value.$2, tasteService.sections[section.key]!)
+                else if (section.key == TasteSection.recommended && tasteService.recommendTime == null && !tasteService.refreshing)
+                  _buildRecommendPrompt(context),
               const SizedBox(height: 16),
               if (tasteService.updateTime != null)
                 Text(
@@ -85,9 +97,12 @@ class TasteView extends StatelessWidget {
 
   Widget _buildProgress(BuildContext context) {
     final bool listing = tasteService.phase == TasteRefreshPhase.listing;
-    final String text = listing
-        ? 'tasteListing'.trParams({'count': '${tasteService.progressDone}'})
-        : 'tasteFetching'.trParams({'done': '${tasteService.progressDone}', 'total': '${tasteService.progressTotal}'});
+    final Map<String, String> progress = {'done': '${tasteService.progressDone}', 'total': '${tasteService.progressTotal}'};
+    final String text = switch (tasteService.phase) {
+      TasteRefreshPhase.listing => 'tasteListing'.trParams({'count': '${tasteService.progressDone}'}),
+      TasteRefreshPhase.recommending => 'tasteRecommending'.trParams(progress),
+      _ => 'tasteFetching'.trParams(progress),
+    };
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -105,7 +120,27 @@ class TasteView extends StatelessWidget {
     );
   }
 
-  Widget _buildSection(BuildContext context, String title, IconData icon, List<TasteItem> items) {
+  /// Caches from before recommendations existed: one refresh fills the section.
+  Widget _buildRecommendPrompt(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: Card(
+        child: ListTile(
+          leading: const Icon(Icons.auto_awesome_outlined),
+          title: Text('tasteRecommended'.tr),
+          subtitle: Text('tasteRecommendPrompt'.tr),
+          trailing: IconButton(icon: const Icon(Icons.refresh), tooltip: 'refresh'.tr, onPressed: tasteService.analyze),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSection(BuildContext context, TasteSection section, String title, IconData icon, List<TasteItem> items) {
+    final String? hint = _hints[section]?.tr;
+    final bool showCount = section != TasteSection.recommended;
+    // with enough recurring entries, one-off ones are just noise
+    final Iterable<TasteItem> shown =
+        _frequencySections.contains(section) && items.where((i) => i.count >= 2).length >= 4 ? items.where((i) => i.count >= 2) : items;
     return Padding(
       padding: const EdgeInsets.only(top: 20),
       child: Column(
@@ -118,15 +153,15 @@ class TasteView extends StatelessWidget {
               Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             ],
           ),
+          if (hint != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text(hint, style: Theme.of(context).textTheme.bodySmall)),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            // with enough recurring entries, one-off ones are just noise
-            children: (items.where((i) => i.count >= 2).length >= 4 ? items.where((i) => i.count >= 2) : items).take(24).map((item) {
+            children: shown.take(24).map((item) {
               final bool following = followService.isFollowing(item.namespace, item.key);
               return InputChip(
-                label: Text('${item.displayName}  ${item.count}'),
+                label: Text(showCount ? '${item.displayName}  ${item.count}' : item.displayName),
                 tooltip: item.displayName == item.key ? null : '${item.namespace}:${item.key}',
                 onPressed: () => newSearch(keyword: item.keyword, forceNewRoute: true),
                 deleteIcon: Icon(following ? Icons.star : Icons.star_border, size: 18, color: following ? Colors.amber : null),

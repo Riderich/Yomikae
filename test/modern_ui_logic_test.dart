@@ -63,5 +63,85 @@ void main() {
       final Map<TasteSection, List<TasteItem>> r = TasteService.rank([g(1, ['artist:a', 'artist:a'])], {});
       expect(r[TasteSection.artist]!.single.count, 1);
     });
+
+    test('an artist whose work matches the taste beats a one-off that does not', () {
+      final List<TasteGallery> galleries = [
+        // newest first: the off-taste artist is even newer
+        g(1, ['artist:off', 'female:tentacles']),
+        for (int i = 2; i < 8; i++) g(i, ['artist:main$i', 'female:glasses', 'female:ponytail']),
+        g(9, ['artist:match', 'female:glasses', 'female:ponytail']),
+      ];
+      final List<String> artists = TasteService.rank(galleries, {})[TasteSection.artist]!.map((i) => i.key).toList();
+      expect(artists.indexOf('match'), lessThan(artists.indexOf('off')));
+    });
+
+    test('favouriting most of a small body of work counts more than a little of a big one', () {
+      final List<TasteGallery> galleries = [
+        g(1, ['artist:prolific', 'female:glasses']),
+        g(2, ['artist:niche', 'female:glasses']),
+      ];
+      final Map<String, int> counts = {'artist:prolific': 800, 'artist:niche': 2, 'female:glasses': 20000};
+      expect(TasteService.rank(galleries, counts)[TasteSection.artist]!.first.key, 'niche');
+      expect(TasteService.hitFactor(2, 2), greaterThan(TasteService.hitFactor(2, 800)));
+      expect(TasteService.hitFactor(1, null), 0.8);
+    });
+
+    test('recent favourites weigh more, old ones still count half', () {
+      expect(TasteService.recency(0, 100), 1);
+      expect(TasteService.recency(30, 100), closeTo(0.75, 1e-9));
+      expect(TasteService.recency(100000, 100), closeTo(0.5, 1e-6));
+      final List<TasteGallery> galleries = [
+        g(1, ['artist:new']),
+        for (int i = 2; i < 200; i++) g(i, ['female:glasses']),
+        g(200, ['artist:old']),
+      ];
+      expect(TasteService.rank(galleries, {})[TasteSection.artist]!.first.key, 'new');
+    });
+
+    test('cosine similarity', () {
+      expect(TasteService.cosine({'a': 1, 'b': 1}, {'a': 2, 'b': 2}), closeTo(1, 1e-9));
+      expect(TasteService.cosine({'a': 1}, {'b': 1}), 0);
+      expect(TasteService.cosine({}, {'b': 1}), 0);
+    });
+  });
+
+  group('taste recommendations', () {
+    TasteGallery g(int gid, List<String> tags) => TasteGallery(gid: gid, token: 'abcdefghij', title: '', category: 'Manga', tags: tags);
+
+    test('recall searches pairs of the strongest common-enough tags', () {
+      final Map<String, double> profile = {'female:glasses': 5, 'female:ponytail': 4, 'female:rare': 9, 'male:x': 3};
+      final Map<String, int> counts = {'female:glasses': 20000, 'female:ponytail': 30000, 'female:rare': 10, 'male:x': 5000};
+      final List<String> seeds = TasteService.seedTags(profile, counts);
+      expect(seeds, ['female:glasses', 'female:ponytail', 'male:x']);
+      expect(TasteService.recallQueries(seeds, 'chinese'), [
+        r'female:"glasses$" female:"ponytail$" language:"chinese$"',
+        r'female:"glasses$" male:"x$" language:"chinese$"',
+        r'female:"ponytail$" male:"x$" language:"chinese$"',
+      ]);
+      expect(TasteService.recallQueries(['female:glasses'], null), [r'female:"glasses$"']);
+      expect(TasteService.recallQueries([], null), isEmpty);
+    });
+
+    test('dominant language needs half of the favourites', () {
+      expect(TasteService.dominantLanguage([g(1, ['language:chinese', 'language:translated']), g(2, ['language:chinese']), g(3, [])]), 'chinese');
+      expect(TasteService.dominantLanguage([g(1, ['language:chinese']), g(2, ['language:english']), g(3, [])]), isNull);
+    });
+
+    test('ranks unknown artists by closeness to the profile and rating', () {
+      final Map<String, double> profile = {'female:glasses': 2, 'female:ponytail': 2};
+      final List<TasteItem> items = TasteService.recommend([
+        (g(1, ['artist:close', 'female:glasses', 'female:ponytail']), 4.8),
+        (g(2, ['artist:far', 'female:glasses', 'male:a', 'male:b', 'male:c']), 4.8),
+        (g(3, ['artist:known', 'female:glasses', 'female:ponytail']), 5.0),
+        (g(4, ['artist:unrelated', 'male:a']), 5.0),
+      ], profile, {'artist:known'}, {});
+      expect(items.map((i) => i.key), ['close', 'far']);
+      expect(items.first.keyword, r'artist:"close$"');
+    });
+
+    test('items survive the cache', () {
+      final TasteItem copy = TasteItem.fromJson(TasteItem('artist', 'a', 3, siteCount: 12, score: 1.5).toJson());
+      expect((copy.namespace, copy.key, copy.count, copy.siteCount, copy.score), ('artist', 'a', 3, 12, 1.5));
+    });
   });
 }
