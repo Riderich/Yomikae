@@ -190,7 +190,34 @@ class _RecommendPageState extends State<RecommendPage> {
         ),
         const SizedBox(height: 6),
         Text('recommendFeedbackHint'.tr, style: small?.copyWith(color: Theme.of(context).colorScheme.outline)),
+        if (recommendService.tasteTags.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Text('recommendMoreTasteTags'.tr, style: small),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: recommendService.tasteTags.map((tag) => _votingChip(context, tag)).toList(),
+          ),
+        ],
       ],
+    );
+  }
+
+  /// Tap: none -> want more -> want less -> none. Long press: the sheet, with search.
+  Widget _votingChip(BuildContext context, String tag) {
+    final int vote = recommendService.tagVote(tag);
+    return GestureDetector(
+      onLongPress: () => RecommendFeedbackSheet.showForTag(context, tag),
+      child: FilterChip(
+        visualDensity: VisualDensity.compact,
+        avatar: vote == 0 ? null : RecommendFeedbackSheet.voteIcon(vote),
+        showCheckmark: false,
+        selected: vote != 0,
+        selectedColor: (vote > 0 ? RecommendFeedbackSheet.likeColor : RecommendFeedbackSheet.dislikeColor).withValues(alpha: 0.15),
+        label: Text(recommendService.label(tag)),
+        onSelected: (_) => recommendService.voteTag(tag, vote == 0 ? 1 : (vote > 0 ? -1 : 0)),
+      ),
     );
   }
 
@@ -202,7 +229,6 @@ class _RecommendPageState extends State<RecommendPage> {
         visualDensity: VisualDensity.compact,
         avatar: vote == 0 ? null : RecommendFeedbackSheet.voteIcon(vote),
         label: Text(recommendService.label(tag)),
-        tooltip: tag,
         onPressed: () => RecommendFeedbackSheet.showForTag(context, tag),
         onDeleted: onDeleted,
       ),
@@ -283,7 +309,6 @@ class _RecommendPageState extends State<RecommendPage> {
             child: InputChip(
               avatar: vote == 0 ? null : RecommendFeedbackSheet.voteIcon(vote),
               label: Text(item.displayName),
-              tooltip: item.displayName == item.key ? null : '${item.namespace}:${item.key}',
               onPressed: () => newSearch(keyword: item.keyword, forceNewRoute: true),
               deleteIcon: Icon(following ? Icons.star : Icons.star_border, size: 18, color: following ? Colors.amber : null),
               deleteButtonTooltipMessage: following ? 'unfollow'.tr : 'follow'.tr,

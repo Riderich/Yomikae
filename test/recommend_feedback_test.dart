@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jhentai/src/service/recommend_feedback.dart';
@@ -59,6 +60,44 @@ void main() {
     final List<int> ranked = f.rank(null, candidates, profile, const {}).map((r) => r.$1).toList();
     expect(ranked.last, 1);
     expect(f.rank(0, candidates, profile, const {}).first.$1, 1);
+  });
+
+  test('favourites by a disliked artist, circle or uploader leave the profile; a disliked content tag does not', () {
+    final List<TasteGallery> favorites = [
+      g(1, ['artist:alice', 'female:maid']),
+      g(2, ['group:circle', 'female:glasses']),
+      TasteGallery(gid: 3, token: 't', title: '3', category: 'Manga', uploader: 'bob', tags: const ['female:ponytail']),
+      g(4, ['female:netorare', 'female:glasses']),
+    ];
+    final RecommendFeedback f = RecommendFeedback()
+      ..voteTag(0, 'artist:alice', -1)
+      ..voteTag(0, 'group:circle', -1)
+      ..voteTag(0, 'uploader:bob', -1)
+      ..voteTag(0, 'female:netorare', -1);
+    expect(f.filterFavorites(favorites).map((g) => g.gid), [4]);
+    expect(RecommendFeedback().filterFavorites(favorites).length, 4);
+  });
+
+  test('more liked tags than seeds take turns', () {
+    final RecommendFeedback f = RecommendFeedback();
+    final List<String> liked = ['female:a', 'female:b', 'female:c', 'female:d', 'female:e', 'female:f', 'female:g', 'female:h'];
+    for (final String tag in liked) {
+      f.voteTag(null, tag, 1);
+    }
+    final Set<String> used = {};
+    for (int i = 0; i < 12; i++) {
+      final List<String> seeds = f.adjustSeeds(null, ['female:glasses'], const {}, random: Random(i));
+      expect(seeds.length, 5);
+      expect(liked, containsAll(seeds));
+      used.addAll(seeds);
+    }
+    expect(used.length, greaterThan(5));
+  });
+
+  test('taste tags are the strongest content tags, common enough to search', () {
+    final Map<String, double> p = {'female:glasses': 3, 'artist:alice': 5, 'female:rare': 4, 'female:maid': 1, 'language:chinese': 9};
+    final Map<String, int> counts = {'female:glasses': 5000, 'female:rare': 20, 'female:maid': 900};
+    expect(RecommendFeedback.tasteTags(p, counts), ['female:glasses', 'female:maid']);
   });
 
   test('json round trip', () {

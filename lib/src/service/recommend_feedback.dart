@@ -141,13 +141,38 @@ class RecommendFeedback {
     return result;
   }
 
-  /// Seed tags with the liked ones first and no disliked ones.
-  List<String> adjustSeeds(int? folder, List<String> seeds, Map<String, int> siteCounts, {int count = 5}) {
+  /// The favourites the profile is built from: without the works of a
+  /// disliked artist, circle or uploader.
+  List<TasteGallery> filterFavorites(List<TasteGallery> favorites) {
+    if (dislikedTags.isEmpty) {
+      return favorites;
+    }
+    return favorites
+        .where((g) => !g.tags.any((t) => _isCreator(t) && dislikedTags.contains(t)) && !(g.uploader != null && dislikedTags.contains('uploader:${g.uploader}')))
+        .toList();
+  }
+
+  static bool _isCreator(String tag) => tag.startsWith('artist:') || tag.startsWith('group:');
+
+  /// Seed tags with liked ones first and no disliked ones. When more tags are
+  /// liked than fit, [random] picks which, so every round searches others.
+  List<String> adjustSeeds(int? folder, List<String> seeds, Map<String, int> siteCounts, {int count = 5, math.Random? random}) {
     final List<String> liked = likedTagsOf(folder)
         .where((tag) => TasteService.isContentTag(tag) && (siteCounts.isEmpty || (siteCounts[tag] ?? 0) >= 300))
         .toList()
-      ..sort();
+      ..sort()
+      ..shuffle(random ?? math.Random());
     return {...liked, ...seeds}.where((tag) => !dislikedTags.contains(tag)).take(count).toList();
+  }
+
+  /// The strongest content tags of [profile] that are common enough to search
+  /// with, for the user to say which they want more or less of.
+  static List<String> tasteTags(Map<String, double> profile, Map<String, int> siteCounts, {int count = 30}) {
+    final List<MapEntry<String, double>> entries = profile.entries
+        .where((e) => TasteService.isContentTag(e.key) && (siteCounts.isEmpty || (siteCounts[e.key] ?? 0) >= 300))
+        .toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return entries.take(count).map((e) => e.key).toList();
   }
 
   /// Ranks recalled galleries for [folder]: similarity to the adjusted

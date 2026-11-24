@@ -174,4 +174,37 @@ void main() {
       expect(hits, ['/chat/completions']);
     });
   });
+
+  test('a connection cut during the TLS handshake is retried once and reported as such', () async {
+    final ServerSocket socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    int connections = 0;
+    socket.listen((client) {
+      connections++;
+      client.destroy();
+    });
+    try {
+      await LlmPageTranslator(
+        baseUrl: 'https://127.0.0.1:${socket.port}/v1/chat/completions',
+        apiKey: 'k',
+        model: 'm',
+        disableThinking: false,
+        timeout: const Duration(seconds: 5),
+      ).ping();
+      fail('should throw');
+    } on LlmApiException catch (e) {
+      expect(e.connectionCut, isTrue);
+      expect(e.status, isNull);
+      expect(e.toString(), contains('HandshakeException'));
+    } finally {
+      await socket.close();
+    }
+    expect(connections, 2);
+  });
+
+  test('the key is cleaned of what copying brings along', () {
+    for (final String pasted in [' sk-teamo-abc\n', 'Bearer sk-teamo-abc', '"sk-teamo-abc"', 'sk-teamo-​abc', '“sk-teamo-abc”']) {
+      expect(LlmPageTranslator.cleanKey(pasted), 'sk-teamo-abc', reason: pasted);
+    }
+    expect(LlmPageTranslator.cleanKey('  '), '');
+  });
 }

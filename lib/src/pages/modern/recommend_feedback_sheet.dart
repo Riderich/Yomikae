@@ -115,8 +115,11 @@ class RecommendFeedbackSheet {
     );
   }
 
-  /// Like / dislike one tag or artist (`namespace:key`).
-  static Future<void> showForTag(BuildContext context, String tag, {String? keyword}) async {
+  /// Like / dislike one tag or artist (`namespace:key`), for the folder shown
+  /// on the recommendation page or, with [scope], for `scope.folder`.
+  static Future<void> showForTag(BuildContext context, String tag, {String? keyword, ({int? folder})? scope}) async {
+    int voteOf() => scope == null ? recommendService.tagVote(tag) : recommendService.tagVoteIn(scope.folder, tag);
+    void vote(int v) => scope == null ? recommendService.voteTag(tag, v) : recommendService.voteTagIn(scope.folder, tag, v);
     recommendService.translateTags([tag]);
     await showModalBottomSheet(
       context: context,
@@ -124,7 +127,7 @@ class RecommendFeedbackSheet {
       builder: (context) => GetBuilder<RecommendService>(
         id: RecommendService.stateId,
         builder: (_) {
-          final int vote = recommendService.tagVote(tag);
+          final int current = voteOf();
           return SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -142,8 +145,8 @@ class RecommendFeedbackSheet {
                           icon: Icons.thumb_up_outlined,
                           label: 'recommendTagLike'.tr,
                           color: likeColor,
-                          selected: vote > 0,
-                          onPressed: () => recommendService.voteTag(tag, vote > 0 ? 0 : 1),
+                          selected: current > 0,
+                          onPressed: () => vote(current > 0 ? 0 : 1),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -152,8 +155,8 @@ class RecommendFeedbackSheet {
                           icon: Icons.thumb_down_outlined,
                           label: 'recommendTagDislike'.tr,
                           color: dislikeColor,
-                          selected: vote < 0,
-                          onPressed: () => recommendService.voteTag(tag, vote < 0 ? 0 : -1),
+                          selected: current < 0,
+                          onPressed: () => vote(current < 0 ? 0 : -1),
                         ),
                       ),
                     ],

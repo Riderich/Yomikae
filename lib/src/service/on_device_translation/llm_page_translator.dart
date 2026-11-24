@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 
@@ -69,7 +70,7 @@ Reply with JSON only, in exactly this form: {"translations":[{"id":<id>,"text":"
       sendTimeout: receiveTimeout,
       receiveTimeout: receiveTimeout,
       headers: {
-        if (apiKey.trim().isNotEmpty) 'Authorization': 'Bearer ${apiKey.trim()}',
+        if (cleanKey(apiKey).isNotEmpty) 'Authorization': 'Bearer ${cleanKey(apiKey)}',
         'Content-Type': 'application/json',
       },
     ));
@@ -80,7 +81,16 @@ Reply with JSON only, in exactly this form: {"translations":[{"id":<id>,"text":"
         final Map<String, dynamic> body = requestBody(endpoint.api, model, system, user, json: json, disableThinking: disableThinking, minimal: minimal);
         Response<dynamic> response;
         try {
-          response = await dio.post(endpoint.url, data: body);
+          try {
+            response = await dio.post(endpoint.url, data: body);
+          } on DioException catch (e) {
+            if (e.type == DioExceptionType.connectionTimeout || !LlmApiException.fromDio(endpoint.url, e).connectionCut) {
+              rethrow;
+            }
+            // a dropped connection is often a one-off; try once more
+            await Future.delayed(const Duration(seconds: 1));
+            response = await dio.post(endpoint.url, data: body);
+          }
         } on DioException catch (e) {
           lastError = LlmApiException.fromDio(endpoint.url, e);
           final int? status = e.response?.statusCode;
@@ -101,6 +111,17 @@ Reply with JSON only, in exactly this form: {"translations":[{"id":<id>,"text":"
       }
     }
     throw lastError!;
+  }
+
+  /// The key as pasted, without what copying tends to bring along: spaces,
+  /// line breaks, invisible characters, quotes and a `Bearer ` prefix.
+  static String cleanKey(String key) {
+    String k = key.replaceAll(RegExp(r'[\s​-‏⁠﻿]'), '');
+    k = k.replaceAll(RegExp('^["\'“”‘’]+|["\'“”‘’]+\$'), '');
+    if (k.toLowerCase().startsWith('bearer')) {
+      k = k.substring(6);
+    }
+    return k;
   }
 
   /// The endpoints to try for what the user typed as the API address:
@@ -243,12 +264,25 @@ class LlmApiException implements Exception {
   final int? status;
   final String message;
 
-  LlmApiException(this.url, this.status, this.message);
+  /// The network cut the connection before the API answered (TLS handshake
+  /// dropped, connection reset or refused): usually the address is blocked
+  /// on this network, not a wrong URL or key.
+  final bool connectionCut;
+
+  LlmApiException(this.url, this.status, this.message, {this.connectionCut = false});
 
   factory LlmApiException.fromDio(String url, DioException e) {
     final int? status = e.response?.statusCode;
     if (status == null) {
-      return LlmApiException(url, null, '${e.type.name}: ${e.message ?? e.error ?? ''}');
+      final Object? cause = e.error;
+      final bool cut = cause is HandshakeException ||
+          cause is SocketException ||
+          RegExp('handshake|connection (reset|refused|closed|terminated)', caseSensitive: false).hasMatch('${e.message} $cause');
+      String detail = '${cause ?? e.message ?? e.type.name}';
+      if (e.type == DioExceptionType.connectionTimeout) {
+        detail = 'connection timed out';
+      }
+      return LlmApiException(url, null, detail, connectionCut: cut || e.type == DioExceptionType.connectionTimeout);
     }
     final dynamic data = e.response?.data;
     String detail = '';

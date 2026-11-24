@@ -144,6 +144,14 @@ class _SettingTranslationPageState extends State<SettingTranslationPage> {
         timeout: const Duration(seconds: 30),
       ).ping();
       return null;
+    } on LlmApiException catch (e) {
+      if (e.connectionCut) {
+        return '${'translationLlmConnectionCut'.tr}\n\n$e';
+      }
+      if (e.status == 401 || e.status == 403) {
+        return '${'translationLlmBadKey'.tr}\n\n$e';
+      }
+      return e.toString();
     } catch (e) {
       return e.toString();
     }
