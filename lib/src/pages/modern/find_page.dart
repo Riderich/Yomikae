@@ -59,6 +59,17 @@ class FindPage extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
         children: [
           _buildSearchBox(context, colors),
+          const SizedBox(height: 12),
+          Card(
+            margin: EdgeInsets.zero,
+            child: ListTile(
+              leading: const Icon(Icons.new_releases_outlined),
+              title: Text('findLatest'.tr),
+              subtitle: Text('findLatestHint'.tr),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => newSearch(keyword: '', forceNewRoute: true),
+            ),
+          ),
           _buildHeader(context, 'category'.tr),
           _buildCategories(),
           _buildHeader(context, 'browseTags'.tr, subtitle: 'browseTagsHint'.tr),

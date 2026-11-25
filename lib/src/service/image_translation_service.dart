@@ -209,6 +209,7 @@ class ImageTranslationService extends GetxController
     required Uint8List imageBytes,
     required String fileName,
     Duration fetchSourceDuration = Duration.zero,
+    void Function(String stage)? onStage,
   }) async {
     final String key = _pageKey(info, index);
     final ImageTranslationEntry current = entry(info, index);
@@ -223,8 +224,8 @@ class ImageTranslationService extends GetxController
 
     try {
       final (List<int> translatedBytes, String extension, ImageTranslationTiming timing) = translationSetting.isOnDevice
-          ? await _translateOnDevice(imageBytes, fetchSourceDuration)
-          : await _translateOnServer(info, index, imageBytes, fileName, fetchSourceDuration);
+          ? await _translateOnDevice(imageBytes, fetchSourceDuration, onStage)
+          : await _translateOnServer(info, index, imageBytes, fileName, fetchSourceDuration, onStage);
 
       final String relativePath = _cacheRelativePath(info, index, extension);
       final File output = File(
@@ -251,8 +252,12 @@ class ImageTranslationService extends GetxController
     }
   }
 
-  Future<(List<int>, String, ImageTranslationTiming)> _translateOnDevice(Uint8List imageBytes, Duration fetchSourceDuration) async {
-    final OnDevicePageResult result = await onDeviceTranslationService.translatePage(imageBytes);
+  Future<(List<int>, String, ImageTranslationTiming)> _translateOnDevice(
+    Uint8List imageBytes,
+    Duration fetchSourceDuration,
+    void Function(String stage)? onStage,
+  ) async {
+    final OnDevicePageResult result = await onDeviceTranslationService.translatePage(imageBytes, onStage: onStage);
     final double fetchSeconds = fetchSourceDuration.inMicroseconds / 1e6;
     final ImageTranslationTiming timing = ImageTranslationTiming(
       total: fetchSeconds + result.stageSeconds.values.fold(0.0, (a, b) => a + b),
@@ -267,7 +272,9 @@ class ImageTranslationService extends GetxController
     Uint8List imageBytes,
     String fileName,
     Duration fetchSourceDuration,
+    void Function(String stage)? onStage,
   ) async {
+    onStage?.call('translationStageServer');
     final Duration timeout = Duration(
       seconds: translationSetting.requestTimeoutSeconds.value,
     );

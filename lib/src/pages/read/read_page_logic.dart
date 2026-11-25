@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:collection/collection.dart';
+import 'package:jhentai/src/pages/read/translation_progress.dart';
 import 'package:dio/dio.dart';
 import 'package:executor/executor.dart';
 import 'package:extended_image/extended_image.dart';
@@ -77,6 +78,10 @@ class ReadPageLogic extends GetxController
   int _translationRangeTotal = 0;
 
   bool get isTranslationRangeRunning => _isTranslationRangeRunning;
+
+  final String translationProgressId = 'translationProgressId';
+  final TranslationProgress translationProgress = TranslationProgress();
+  Timer? _translationTicker;
   String get translationRangeProgress =>
       '$_translationRangeCompleted/$_translationRangeTotal';
 
@@ -291,6 +296,7 @@ class ReadPageLogic extends GetxController
   @override
   void onClose() {
     _stopTranslationRangeRequested = true;
+    _translationTicker?.cancel();
     super.onClose();
 
     WidgetsBinding.instance.removeObserver(this);
@@ -895,11 +901,43 @@ class ReadPageLogic extends GetxController
     await translatePageAtIndex(state.readPageInfo.currentImageIndex);
   }
 
+  /// Queues [pages] for the progress bar and keeps it ticking while it shows.
+  void _queueTranslations(int pages) {
+    translationProgress.add(pages);
+    updateSafely([translationProgressId]);
+    _translationTicker ??= Timer.periodic(const Duration(seconds: 1), (timer) {
+      updateSafely([translationProgressId]);
+      if (!translationProgress.visibleAt(DateTime.now())) {
+        timer.cancel();
+        _translationTicker = null;
+      }
+    });
+  }
+
+  /// [_translatePage] with its time and outcome recorded in the progress.
+  Future<ImageTranslationTiming?> _translateTracked(int index) async {
+    final DateTime start = DateTime.now();
+    translationProgress.startPage(index, start);
+    updateSafely([translationProgressId]);
+    try {
+      final ImageTranslationTiming? timing = await _translatePage(index);
+      final DateTime now = DateTime.now();
+      translationProgress.finishPage(seconds: now.difference(start).inMilliseconds / 1000, now: now);
+      return timing;
+    } catch (_) {
+      translationProgress.finishPage(ok: false, now: DateTime.now());
+      rethrow;
+    } finally {
+      updateSafely([translationProgressId]);
+    }
+  }
+
   Future<void> translatePageAtIndex(int index) async {
     try {
       state.showTranslatedImages = true;
       updateSafely([topMenuId]);
-      final ImageTranslationTiming? timing = await _translatePage(index);
+      _queueTranslations(1);
+      final ImageTranslationTiming? timing = await _translateTracked(index);
       toast(
         timing == null ? 'translationCompleted'.tr : '${'translationCompleted'.tr}\n${timing.summary()}',
         isShort: timing == null,
@@ -996,6 +1034,7 @@ class ReadPageLogic extends GetxController
     _translationRangeTotal = toIndex - fromIndex + 1;
     state.showTranslatedImages = true;
     updateSafely([topMenuId]);
+    _queueTranslations(_translationRangeTotal);
 
     int failed = 0;
     final List<ImageTranslationTiming> timings = [];
@@ -1006,9 +1045,11 @@ class ReadPageLogic extends GetxController
         }
         final ImageTranslationEntry entry =
             imageTranslationService.entry(state.readPageInfo, index);
-        if (entry.status != ImageTranslationStatus.success) {
+        if (entry.status == ImageTranslationStatus.success) {
+          translationProgress.finishPage(now: DateTime.now());
+        } else {
           try {
-            final ImageTranslationTiming? timing = await _translatePage(index);
+            final ImageTranslationTiming? timing = await _translateTracked(index);
             if (timing != null) {
               timings.add(timing);
             }
@@ -1023,6 +1064,8 @@ class ReadPageLogic extends GetxController
       }
     } finally {
       final bool stopped = _stopTranslationRangeRequested;
+      translationProgress.cancel(_translationRangeTotal - _translationRangeCompleted, DateTime.now());
+      updateSafely([translationProgressId]);
       _isTranslationRangeRunning = false;
       _stopTranslationRangeRequested = false;
       updateSafely([topMenuId]);
@@ -1050,6 +1093,12 @@ class ReadPageLogic extends GetxController
 
   Future<ImageTranslationTiming?> _translatePage(int index) async {
     final Stopwatch fetchStopwatch = Stopwatch()..start();
+    void onStage(String stage) {
+      translationProgress.stage = stage;
+      updateSafely([translationProgressId]);
+    }
+
+    onStage('translationStageFetch');
     GalleryImage? image = state.images[index];
     if (image == null && state.readPageInfo.mode == ReadMode.online) {
       if (state.thumbnails[index] == null) {
@@ -1090,6 +1139,7 @@ class ReadPageLogic extends GetxController
       imageBytes: bytes,
       fileName: fileName,
       fetchSourceDuration: fetchStopwatch.elapsed,
+      onStage: onStage,
     );
   }
 

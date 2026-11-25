@@ -13,6 +13,7 @@ import 'package:jhentai/src/pages/read/layout/horizontal_list/horizontal_list_la
 import 'package:jhentai/src/pages/read/layout/horizontal_page/horizontal_page_layout.dart';
 import 'package:jhentai/src/pages/read/read_page_logic.dart';
 import 'package:jhentai/src/pages/read/read_page_state.dart';
+import 'package:jhentai/src/pages/read/translation_progress.dart';
 import 'package:jhentai/src/service/super_resolution_service.dart';
 import 'package:jhentai/src/service/image_translation_service.dart';
 import 'package:jhentai/src/widget/eh_mouse_button_listener.dart';
@@ -114,6 +115,7 @@ class _ReadPageState extends State<ReadPage>
                     ),
                     buildRightBottomInfo(context),
                     buildTopMenu(context),
+                    buildTranslationProgress(context),
                     buildBottomMenu(context),
                   ],
                 ),
@@ -273,6 +275,106 @@ class _ReadPageState extends State<ReadPage>
   }
 
   /// top menu
+  /// Pages done, the step the current page is at, seconds per page and the
+  /// time left, while translating and for a moment after.
+  Widget buildTranslationProgress(BuildContext context) {
+    return GetBuilder<ReadPageLogic>(
+      id: logic.translationProgressId,
+      builder: (_) => GetBuilder<ReadPageLogic>(
+        id: logic.topMenuId,
+        builder: (_) {
+          final DateTime now = DateTime.now();
+          final TranslationProgress p = logic.translationProgress;
+          if (!p.visibleAt(now)) {
+            return const SizedBox.shrink();
+          }
+          const TextStyle textStyle = TextStyle(color: Colors.white, fontSize: 13, decoration: TextDecoration.none);
+          final TextStyle detailStyle = textStyle.copyWith(fontSize: 12, color: Colors.white70);
+
+          final String title = !p.running
+              ? 'translationProgressDone'.trParams({'done': '${p.done - p.failed}'})
+              : p.total > 1
+                  ? 'translationProgressRange'.trParams({'done': '${p.done}', 'total': '${p.total}'})
+                  : 'translationProgressPage'.trParams({'page': '${(p.currentPage ?? 0) + 1}'});
+          final double? perPage = p.secondsPerPage;
+          final Duration? left = p.remaining(now);
+          final List<String> details = [
+            if (p.running && p.total > 1 && p.currentPage != null) 'translationProgressPage'.trParams({'page': '${p.currentPage! + 1}'}),
+            if (p.running && p.stage != null) p.stage!.tr,
+            if (p.running) 'translationProgressElapsed'.trParams({'time': _seconds(p.currentSeconds(now))}),
+            if (perPage != null) 'translationProgressSpeed'.trParams({'time': _seconds(perPage)}),
+            if (left != null && p.total > 1) 'translationProgressRemaining'.trParams({'time': _seconds(left.inMilliseconds / 1000)}),
+            if (p.failed > 0) 'translationProgressFailed'.trParams({'count': '${p.failed}'}),
+          ];
+
+          return Positioned(
+            top: (state.isMenuOpen ? UIConfig.appBarHeight : 0) + context.mediaQuery.padding.top + 8,
+            left: 12,
+            right: 12,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Material(
+                  color: Colors.black.withValues(alpha: 0.8),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 8, 6, 10),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.translate, size: 16, color: Colors.white),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(title, style: textStyle)),
+                            if (logic.isTranslationRangeRunning)
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  visualDensity: VisualDensity.compact,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                onPressed: logic.stopTranslationRange,
+                                child: Text('stopTranslationRange'.tr),
+                              )
+                            else
+                              const SizedBox(height: 32),
+                          ],
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8, top: 2, bottom: 6),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(2),
+                            child: LinearProgressIndicator(
+                              value: p.running ? p.fraction(now) : 1,
+                              minHeight: 4,
+                              backgroundColor: Colors.white24,
+                            ),
+                          ),
+                        ),
+                        if (details.isNotEmpty) Text(details.join('  ·  '), style: detailStyle),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// "8.2 秒" / "1 分 12 秒"
+  static String _seconds(double seconds) {
+    if (seconds < 60) {
+      return 'translationSeconds'.trParams({'s': seconds < 10 ? seconds.toStringAsFixed(1) : '${seconds.round()}'});
+    }
+    final int total = seconds.round();
+    return 'translationMinutesSeconds'.trParams({'m': '${total ~/ 60}', 's': '${total % 60}'});
+  }
+
   Widget buildTopMenu(BuildContext context) {
     return GetBuilder<ReadPageLogic>(
       id: logic.topMenuId,

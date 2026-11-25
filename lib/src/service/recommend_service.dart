@@ -11,7 +11,10 @@ import 'package:jhentai/src/model/gallery_tag.dart';
 import 'package:jhentai/src/model/gallery_page.dart';
 import 'package:jhentai/src/model/search_config.dart';
 import 'package:jhentai/src/network/eh_request.dart';
+import 'package:jhentai/src/model/gallery_history_model.dart';
 import 'package:jhentai/src/service/follow_service.dart';
+import 'package:jhentai/src/service/history_service.dart';
+import 'package:jhentai/src/setting/user_setting.dart';
 import 'package:jhentai/src/service/path_service.dart';
 import 'package:jhentai/src/service/recommend_feedback.dart';
 import 'package:jhentai/src/service/tag_translation_service.dart';
@@ -87,9 +90,23 @@ class Recommendation {
 class RecommendService extends GetxController with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   static const String stateId = 'recommendState';
 
-  /// Recommendations shown per folder.
+  /// Recommendations shown per folder after a fresh round, and added by
+  /// each "more" round of the feed.
   static const int maxGalleries = 60;
+  static const int moreGalleries = 40;
   static const int maxArtists = 16;
+
+  /// Read galleries used as a (weaker) taste signal, newest first.
+  static const int maxHistory = 500;
+
+  /// How much a read gallery counts compared with a favourite.
+  static const double historyWeight = 0.5;
+
+  /// A recommendation older than this is redone when the feed is shown.
+  static const Duration staleAfter = Duration(hours: 12);
+
+  /// Favourites are read again when their analysis is older than this.
+  static const Duration tasteStaleAfter = Duration(days: 3);
 
   /// folder (null = all favourites) -> last recommendation.
   final Map<int?, Recommendation> results = {};
@@ -100,6 +117,25 @@ class RecommendService extends GetxController with JHLifeCircleBeanErrorCatch im
   /// The folder being computed, while [running].
   int? runningFolder;
   bool running = false;
+
+  /// Whether the running round adds to the feed instead of starting over.
+  bool runningMore = false;
+
+  /// folder key -> a "more" round found nothing new.
+  final Map<String, bool> _exhausted = {};
+
+  /// Read galleries (not favourited), newest first, and all read gids.
+  List<TasteGallery> _history = [];
+  Set<int> _readGids = {};
+
+  /// The shortest time between the end of a round and the next "more" round.
+  static const Duration moreInterval = Duration(seconds: 20);
+  DateTime? _lastRoundEnd;
+  bool _moreWaiting = false;
+
+  bool _autoBusy = false;
+  bool _autoAnalyzed = false;
+  DateTime? _lastEnsure;
   int progressDone = 0;
   int progressTotal = 0;
   String? error;
@@ -249,8 +285,11 @@ class RecommendService extends GetxController with JHLifeCircleBeanErrorCatch im
     // recommended by an older version, which did not keep them
     return _tasteTagsMemo.putIfAbsent(RecommendFeedback.keyOf(folder), () {
       final Map<String, int> siteCounts = tasteService.siteCounts;
-      final Map<String, double> profile =
-          feedback.adjustProfile(folder, TasteService.profileOf(feedback.filterFavorites(tasteService.galleriesOf(folder)), siteCounts), siteCounts);
+      final Map<String, double> profile = feedback.adjustProfile(
+        folder,
+        profileOf(feedback.filterFavorites(tasteService.galleriesOf(folder)), folder == null ? feedback.filterFavorites(_history) : const [], siteCounts),
+        siteCounts,
+      );
       final List<String> tags = RecommendFeedback.tasteTags(profile, siteCounts, count: 30 + r.seeds.length).where((t) => !r.seeds.contains(t)).take(30).toList();
       translateTags(tags);
       return tags;
@@ -260,26 +299,129 @@ class RecommendService extends GetxController with JHLifeCircleBeanErrorCatch im
   /// Translated names for tags shown outside the recommendation itself.
   Future<void> translateTags(Iterable<String> tags) => _translate(extra: tags);
 
-  /// Searches and ranks recommendations for [folder] (null = all favourites).
-  Future<void> recommend(int? folder) async {
-    final List<TasteGallery> favorites = tasteService.galleriesOf(folder);
-    if (running || favorites.isEmpty) {
+  /// Whether there is anything to recommend from: favourites or, for all
+  /// favourites, reading history.
+  bool canRecommend(int? folder) => tasteService.galleriesOf(folder).isNotEmpty || (folder == null && _history.isNotEmpty);
+
+  bool get exhausted => _exhausted[RecommendFeedback.keyOf(folder)] ?? false;
+
+  /// Reads the reading history: a taste signal, and works not to recommend.
+  Future<void> _loadHistory() async {
+    try {
+      final List<GalleryHistoryV2Data> rows = await historyService.getLatest10000RawHistory();
+      _readGids = rows.map((r) => r.gid).toSet();
+      final List<TasteGallery> history = [];
+      for (GalleryHistoryV2Data row in rows) {
+        if (history.length >= maxHistory) {
+          break;
+        }
+        if (tasteService.galleries.containsKey(row.gid)) {
+          continue;
+        }
+        final GalleryHistoryModel h = GalleryHistoryModel.fromJson(jsonDecode(row.jsonBody));
+        if (h.tags.isNotEmpty) {
+          history.add(TasteGallery(
+            gid: h.galleryUrl.gid,
+            token: h.galleryUrl.token,
+            title: h.title,
+            category: h.category,
+            uploader: h.uploader.isEmpty ? null : h.uploader,
+            tags: h.tags,
+          ));
+        }
+      }
+      _history = history;
+    } catch (e) {
+      log.warning('Read history for recommendations failed', e);
+    }
+  }
+
+  /// Shows the feed fresh: reads the favourites the first time (and when
+  /// their analysis is old), and recommends again when the last
+  /// recommendation is old. Cheap to call often.
+  Future<void> ensureFresh() async {
+    final DateTime now = DateTime.now();
+    if (running || tasteService.refreshing || _autoBusy || (_lastEnsure != null && now.difference(_lastEnsure!) < const Duration(minutes: 1))) {
       return;
     }
+    _lastEnsure = now;
+    _autoBusy = true;
+    try {
+      final bool favoritesReadable = userSetting.hasLoggedIn() || TasteService.testSource.isNotEmpty;
+      final DateTime? analyzed = tasteService.updateTime;
+      if (favoritesReadable && !_autoAnalyzed && (analyzed == null || now.difference(analyzed) > tasteStaleAfter)) {
+        _autoAnalyzed = true;
+        await tasteService.analyze();
+      }
+      await _loadHistory();
+      final Recommendation? r = results[folder];
+      if (canRecommend(folder) && (r == null || now.difference(r.time) > staleAfter)) {
+        await recommend(folder);
+      } else {
+        updateSafely([stateId]);
+      }
+    } finally {
+      _autoBusy = false;
+    }
+  }
+
+  /// The next part of the feed: more works for the shown folder, searched
+  /// from where the last round left off.
+  Future<void> loadMore() async {
+    if (running || _moreWaiting || current == null || exhausted) {
+      return;
+    }
+    // every round is a dozen requests: keep rounds apart, or EH bans the IP
+    final DateTime? last = _lastRoundEnd;
+    if (last != null) {
+      final Duration wait = moreInterval - DateTime.now().difference(last);
+      if (wait > Duration.zero) {
+        _moreWaiting = true;
+        await Future.delayed(wait);
+        _moreWaiting = false;
+      }
+    }
+    await recommend(folder, more: true);
+  }
+
+  /// Searches and ranks recommendations for [folder] (null = all favourites,
+  /// together with the reading history). With [more], adds works to the
+  /// current recommendation instead of starting over.
+  Future<void> recommend(int? folder, {bool more = false}) async {
+    if (running) {
+      return;
+    }
+    // claimed before the first await, so that two calls never run together
     running = true;
+    if (_readGids.isEmpty) {
+      await _loadHistory();
+    }
+    final List<TasteGallery> favorites = feedback.filterFavorites(tasteService.galleriesOf(folder));
+    final List<TasteGallery> basis = [...favorites, if (folder == null) ...feedback.filterFavorites(_history)];
+    final Recommendation? previous = results[folder];
+    if (basis.isEmpty || (more && previous == null)) {
+      running = false;
+      updateSafely([stateId]);
+      return;
+    }
+    runningMore = more;
     runningFolder = folder;
     error = null;
     progressDone = 0;
     progressTotal = 0;
+    if (!more) {
+      _exhausted.remove(RecommendFeedback.keyOf(folder));
+    }
     updateSafely([stateId]);
 
     try {
       final Map<String, int> siteCounts = tasteService.siteCounts;
-      final Map<String, double> profile = feedback.adjustProfile(folder, TasteService.profileOf(feedback.filterFavorites(favorites), siteCounts), siteCounts);
+      final Map<String, double> profile = feedback.adjustProfile(folder, profileOf(favorites, folder == null ? feedback.filterFavorites(_history) : const [], siteCounts), siteCounts);
       final List<String> seeds = feedback.adjustSeeds(folder, TasteService.seedTags(profile, siteCounts, count: 8), siteCounts);
-      final String? language = TasteService.dominantLanguage(favorites);
-      final List<String> styles = TasteService.styleTermsOf(favorites);
-      final Set<String> categories = TasteService.categoriesOf(favorites);
+      final String? language = TasteService.dominantLanguage(basis);
+      final List<String> styles = TasteService.styleTermsOf(basis);
+      final Set<String> categories = TasteService.categoriesOf(basis);
+      final Set<int> alreadyShown = more ? previous!.galleries.map((g) => g.gid).toSet() : const {};
       final List<String> queries = TasteService.recallQueries(seeds, language, required: styles);
       if (queries.isEmpty) {
         error = 'recommendNoTags'.tr;
@@ -303,7 +445,10 @@ class RecommendService extends GetxController with JHLifeCircleBeanErrorCatch im
           cursors[query] = page.nextGid!;
         }
         for (Gallery g in page.galleries) {
-          if (!tasteService.galleries.containsKey(g.gid) && found.length < TasteService.maxRecallGalleries) {
+          if (!tasteService.galleries.containsKey(g.gid) &&
+              !_readGids.contains(g.gid) &&
+              !alreadyShown.contains(g.gid) &&
+              found.length < TasteService.maxRecallGalleries) {
             found.putIfAbsent(g.gid, () => g);
           }
         }
@@ -327,7 +472,7 @@ class RecommendService extends GetxController with JHLifeCircleBeanErrorCatch im
 
       // rank
       final List<(int, double)> ranked = feedback.rank(folder, rated, profile, siteCounts);
-      final List<int> kept = ranked.take(maxGalleries).map((r) => r.$1).toList();
+      final List<int> kept = ranked.take(more ? moreGalleries : maxGalleries).map((r) => r.$1).toList();
       final Map<int, List<String>> tagsByGid = {for ((TasteGallery, double) r in rated) r.$1.gid: r.$1.tags};
       final Set<String> knownArtists = {
         ...TasteService.knownArtists(tasteService.galleries.values),
@@ -338,6 +483,16 @@ class RecommendService extends GetxController with JHLifeCircleBeanErrorCatch im
       };
       final List<(TasteGallery, double)> artistCandidates =
           rated.where((r) => !feedback.dislikedGalleries.containsKey(r.$1.gid) && !r.$1.tags.any(feedback.dislikedTags.contains)).toList();
+      if (more) {
+        if (kept.isEmpty) {
+          _exhausted[RecommendFeedback.keyOf(folder)] = true;
+        }
+        previous!.galleries.addAll(kept.map((gid) => found[gid]!));
+        previous.tags.addAll({for (int gid in kept) gid: tagsByGid[gid] ?? const []});
+        feedback.addShown(folder, kept);
+        await _saveCache();
+        return;
+      }
       results[folder] = Recommendation(
         time: DateTime.now(),
         galleries: kept.map((gid) => found[gid]!).toList(),
@@ -358,8 +513,19 @@ class RecommendService extends GetxController with JHLifeCircleBeanErrorCatch im
       error = e.toString();
     } finally {
       running = false;
+      runningMore = false;
+      _lastRoundEnd = DateTime.now();
       updateSafely([stateId]);
     }
+  }
+
+  /// The taste profile: favourites (recent ones a bit more) and, weaker,
+  /// read galleries.
+  static Map<String, double> profileOf(List<TasteGallery> favorites, List<TasteGallery> history, Map<String, int> siteCounts) {
+    return TasteService.tagVector([
+      for (int i = 0; i < favorites.length; i++) (favorites[i], TasteService.recency(i, favorites.length)),
+      for (int i = 0; i < history.length; i++) (history[i], historyWeight * TasteService.recency(i, history.length)),
+    ], siteCounts);
   }
 
   static SearchConfig _searchConfig(String query, Set<String> categories) {

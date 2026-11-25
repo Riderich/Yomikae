@@ -135,7 +135,9 @@ class OnDeviceTranslationService extends GetxController with JHLifeCircleBeanErr
     }();
   }
 
-  Future<OnDevicePageResult> translatePage(Uint8List imageBytes) async {
+  /// Translates one page; [onStage] hears each step as it starts
+  /// (`translationStage*` l18n keys), for a progress display.
+  Future<OnDevicePageResult> translatePage(Uint8List imageBytes, {void Function(String stage)? onStage}) async {
     if (!models.allInstalled) {
       throw StateError('translationModelsMissing'.tr);
     }
@@ -154,6 +156,7 @@ class OnDeviceTranslationService extends GetxController with JHLifeCircleBeanErr
     final (Uint8List rgba, int width, int height) = await _decode(imageBytes);
     stages['translationStageOther'] = lap();
 
+    onStage?.call('translationStageDetection');
     final OcrResult ocr = await _engine.analyze(rgba, width, height);
     lap();
     stages['translationStageDetection'] = ocr.detection.inMicroseconds / 1e6;
@@ -168,9 +171,11 @@ class OnDeviceTranslationService extends GetxController with JHLifeCircleBeanErr
       disableThinking: translationSetting.disableThinking.value,
       timeout: Duration(seconds: translationSetting.requestTimeoutSeconds.value),
     );
+    onStage?.call('translationStageTranslating');
     final Map<int, String> translations = await translator.translate(texts, translationSetting.targetLanguage.value);
     stages['translationStageTranslating'] = lap();
 
+    onStage?.call('translationStageInpainting');
     final List<RenderItem> items = [];
     for (final MapEntry<int, String> entry in translations.entries) {
       if (entry.key < 0 || entry.key >= blocks.length) {
@@ -181,13 +186,16 @@ class OnDeviceTranslationService extends GetxController with JHLifeCircleBeanErr
     }
     stages['translationStageInpainting'] = lap();
 
+    onStage?.call('translationStageRendering');
     final String target = translationSetting.targetLanguage.value.toLowerCase();
     final Uint8List png = await PageRenderer.render(
       rgba,
       width,
       height,
       items,
-      verticalAllowed: target.startsWith('zh') || target.startsWith('ja'),
+      // only Japanese reads in right-to-left columns; Chinese translations
+      // read left to right, top to bottom, even in a tall bubble
+      verticalAllowed: target.startsWith('ja'),
     );
     stages['translationStageRendering'] = lap();
 

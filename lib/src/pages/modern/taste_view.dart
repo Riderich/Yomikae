@@ -24,6 +24,10 @@ class TasteView extends StatelessWidget {
   /// star can be undone.
   static final Set<String> _followedHere = {};
 
+  /// Sections opened to all their entries; the others show [_collapsedCount].
+  static final ValueNotifier<Set<TasteSection>> _expanded = ValueNotifier({});
+  static const int _collapsedCount = 6;
+
   static const Map<TasteSection, (String, IconData)> _sections = {
     TasteSection.artist: ('tasteArtists', Icons.brush_outlined),
     TasteSection.group: ('tasteGroups', Icons.groups_outlined),
@@ -173,59 +177,96 @@ class TasteView extends StatelessWidget {
       followed = shown.where(hidden).length;
       shown = shown.where((i) => !hidden(i));
     }
-    return Padding(
-      padding: const EdgeInsets.only(top: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    final List<TasteItem> all = shown.take(24).toList();
+    return ValueListenableBuilder<Set<TasteSection>>(
+      valueListenable: _expanded,
+      builder: (_, expandedSections, __) {
+        final bool expanded = expandedSections.contains(section);
+        final bool collapsible = all.length > _collapsedCount;
+        void toggle() => _expanded.value = expanded ? ({...expandedSections}..remove(section)) : {...expandedSections, section};
+        final Color outline = Theme.of(context).colorScheme.outline;
+        return Padding(
+          padding: const EdgeInsets.only(top: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, size: 20),
-              const SizedBox(width: 8),
-              Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-            ],
-          ),
-          if (hint != null) Padding(padding: const EdgeInsets.only(top: 4), child: Text(hint, style: Theme.of(context).textTheme.bodySmall)),
-          if (followed > 0)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text('tasteFollowedHidden'.trParams({'count': '$followed'}), style: Theme.of(context).textTheme.bodySmall),
-            ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: shown.take(24).map((item) {
-              final String tag = '${item.namespace}:${item.key}';
-              final bool following = followService.isFollowing(item.namespace, item.key);
-              final int vote = recommendService.tagVoteIn(tasteService.folder, tag);
-              final ({int? folder}) scope = (folder: tasteService.folder);
-              return GestureDetector(
-                onLongPress: () => RecommendFeedbackSheet.showForTag(context, tag, keyword: item.keyword, scope: scope),
-                child: Opacity(
-                  opacity: vote < 0 ? 0.5 : 1,
-                  child: InputChip(
-                    avatar: vote == 0 ? null : RecommendFeedbackSheet.voteIcon(vote),
-                    label: Text(
-                      '${item.displayName}  ${item.count}',
-                      style: vote < 0 ? const TextStyle(decoration: TextDecoration.lineThrough) : null,
-                    ),
-                    onPressed: () => newSearch(keyword: item.keyword, forceNewRoute: true),
-                    deleteIcon: Icon(following ? Icons.star : Icons.star_border, size: 18, color: following ? Colors.amber : null),
-                    deleteButtonTooltipMessage: following ? 'unfollow'.tr : 'follow'.tr,
-                    onDeleted: () {
-                      if (!following) {
-                        _followedHere.add(tag);
-                      }
-                      followService.toggle(item.namespace, item.key, label: item.label);
-                    },
+              InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: collapsible ? toggle : null,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Icon(icon, size: 18, color: outline),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '$title  ${all.length}',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      if (collapsible) Icon(expanded ? Icons.expand_less : Icons.expand_more, size: 20, color: outline),
+                    ],
                   ),
                 ),
-              );
-            }).toList(),
+              ),
+              if (expanded && hint != null) Padding(padding: const EdgeInsets.only(top: 2), child: Text(hint, style: Theme.of(context).textTheme.bodySmall)),
+              if (expanded && followed > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text('tasteFollowedHidden'.trParams({'count': '$followed'}), style: Theme.of(context).textTheme.bodySmall),
+                ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  ...(expanded ? all : all.take(_collapsedCount)).map((item) {
+                    final String tag = '${item.namespace}:${item.key}';
+                    final bool following = followService.isFollowing(item.namespace, item.key);
+                    final int vote = recommendService.tagVoteIn(tasteService.folder, tag);
+                    final ({int? folder}) scope = (folder: tasteService.folder);
+                    return GestureDetector(
+                      onLongPress: () => RecommendFeedbackSheet.showForTag(context, tag, keyword: item.keyword, scope: scope),
+                      child: Opacity(
+                        opacity: vote < 0 ? 0.5 : 1,
+                        child: InputChip(
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          avatar: vote == 0 ? null : RecommendFeedbackSheet.voteIcon(vote, size: 14),
+                          label: Text(
+                            '${item.displayName}  ${item.count}',
+                            style: TextStyle(fontSize: 12.5, decoration: vote < 0 ? TextDecoration.lineThrough : null),
+                          ),
+                          onPressed: () => newSearch(keyword: item.keyword, forceNewRoute: true),
+                          deleteIcon: Icon(following ? Icons.star : Icons.star_border, size: 16, color: following ? Colors.amber : null),
+                          deleteButtonTooltipMessage: following ? 'unfollow'.tr : 'follow'.tr,
+                          onDeleted: () {
+                            if (!following) {
+                              _followedHere.add(tag);
+                            }
+                            followService.toggle(item.namespace, item.key, label: item.label);
+                          },
+                        ),
+                      ),
+                    );
+                  }),
+                  if (collapsible)
+                    ActionChip(
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      label: Text(
+                        expanded ? 'tasteCollapse'.tr : 'tasteShowAll'.trParams({'count': '${all.length}'}),
+                        style: TextStyle(fontSize: 12.5, color: outline),
+                      ),
+                      onPressed: toggle,
+                    ),
+                ],
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

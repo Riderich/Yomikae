@@ -69,9 +69,7 @@ class DashboardPage extends BasePage {
               _buildRanklist(),
               _buildPopularListDesc(),
               _buildPopular(),
-              _buildGalleryDesc(context),
-              _buildGalleryBody(context),
-              super.buildLoadMoreIndicator(),
+              ...buildMainSlivers(context),
             ],
           ),
         ),
@@ -81,6 +79,13 @@ class DashboardPage extends BasePage {
 
   /// Extra sections above the rank list.
   List<Widget> buildLeadingSlivers(BuildContext context) => const [];
+
+  /// The endless list below the rank and popular strips: the latest galleries.
+  List<Widget> buildMainSlivers(BuildContext context) => [
+        _buildGalleryDesc(context),
+        _buildGalleryBody(context),
+        super.buildLoadMoreIndicator(),
+      ];
 
   @override
   Widget buildPullDownIndicator() {

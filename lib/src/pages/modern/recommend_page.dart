@@ -25,6 +25,10 @@ class RecommendPage extends StatefulWidget {
 }
 
 class _RecommendPageState extends State<RecommendPage> {
+  /// The extra taste tags start folded: they are for tuning, not reading.
+  bool _tasteTagsOpen = false;
+  bool _artistsOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -191,14 +195,34 @@ class _RecommendPageState extends State<RecommendPage> {
         const SizedBox(height: 6),
         Text('recommendFeedbackHint'.tr, style: small?.copyWith(color: Theme.of(context).colorScheme.outline)),
         if (recommendService.tasteTags.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          Text('recommendMoreTasteTags'.tr, style: small),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: recommendService.tasteTags.map((tag) => _votingChip(context, tag)).toList(),
+          const SizedBox(height: 8),
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => setState(() => _tasteTagsOpen = !_tasteTagsOpen),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'recommendMoreTasteTagsTitle'.trParams({'count': '${recommendService.tasteTags.length}'}),
+                      style: small?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  Icon(_tasteTagsOpen ? Icons.expand_less : Icons.expand_more, size: 20, color: Theme.of(context).colorScheme.outline),
+                ],
+              ),
+            ),
           ),
+          if (_tasteTagsOpen) ...[
+            Text('recommendMoreTasteTags'.tr, style: small?.copyWith(color: Theme.of(context).colorScheme.outline)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: recommendService.tasteTags.map((tag) => _votingChip(context, tag)).toList(),
+            ),
+          ],
         ],
       ],
     );
@@ -211,7 +235,9 @@ class _RecommendPageState extends State<RecommendPage> {
       onLongPress: () => RecommendFeedbackSheet.showForTag(context, tag),
       child: FilterChip(
         visualDensity: VisualDensity.compact,
-        avatar: vote == 0 ? null : RecommendFeedbackSheet.voteIcon(vote),
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        labelStyle: const TextStyle(fontSize: 12.5),
+        avatar: vote == 0 ? null : RecommendFeedbackSheet.voteIcon(vote, size: 14),
         showCheckmark: false,
         selected: vote != 0,
         selectedColor: (vote > 0 ? RecommendFeedbackSheet.likeColor : RecommendFeedbackSheet.dislikeColor).withValues(alpha: 0.15),
@@ -227,7 +253,9 @@ class _RecommendPageState extends State<RecommendPage> {
       onLongPress: () => RecommendFeedbackSheet.showForTag(context, tag),
       child: InputChip(
         visualDensity: VisualDensity.compact,
-        avatar: vote == 0 ? null : RecommendFeedbackSheet.voteIcon(vote),
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        labelStyle: const TextStyle(fontSize: 12.5),
+        avatar: vote == 0 ? null : RecommendFeedbackSheet.voteIcon(vote, size: 14),
         label: Text(recommendService.label(tag)),
         onPressed: () => RecommendFeedbackSheet.showForTag(context, tag),
         onDeleted: onDeleted,
@@ -299,23 +327,38 @@ class _RecommendPageState extends State<RecommendPage> {
     return GetBuilder<FollowService>(
       id: FollowService.entriesId,
       builder: (_) => Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: r.artists.map((item) {
-          final bool following = followService.isFollowing(item.namespace, item.key);
-          final int vote = recommendService.tagVote('${item.namespace}:${item.key}');
-          return GestureDetector(
-            onLongPress: () => RecommendFeedbackSheet.showForTag(context, '${item.namespace}:${item.key}', keyword: item.keyword),
-            child: InputChip(
-              avatar: vote == 0 ? null : RecommendFeedbackSheet.voteIcon(vote),
-              label: Text(item.displayName),
-              onPressed: () => newSearch(keyword: item.keyword, forceNewRoute: true),
-              deleteIcon: Icon(following ? Icons.star : Icons.star_border, size: 18, color: following ? Colors.amber : null),
-              deleteButtonTooltipMessage: following ? 'unfollow'.tr : 'follow'.tr,
-              onDeleted: () => followService.toggle(item.namespace, item.key, label: item.label),
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          ...(_artistsOpen ? r.artists : r.artists.take(6)).map((item) {
+            final bool following = followService.isFollowing(item.namespace, item.key);
+            final int vote = recommendService.tagVote('${item.namespace}:${item.key}');
+            return GestureDetector(
+              onLongPress: () => RecommendFeedbackSheet.showForTag(context, '${item.namespace}:${item.key}', keyword: item.keyword),
+              child: InputChip(
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                labelStyle: const TextStyle(fontSize: 12.5),
+                avatar: vote == 0 ? null : RecommendFeedbackSheet.voteIcon(vote, size: 14),
+                label: Text(item.displayName),
+                onPressed: () => newSearch(keyword: item.keyword, forceNewRoute: true),
+                deleteIcon: Icon(following ? Icons.star : Icons.star_border, size: 16, color: following ? Colors.amber : null),
+                deleteButtonTooltipMessage: following ? 'unfollow'.tr : 'follow'.tr,
+                onDeleted: () => followService.toggle(item.namespace, item.key, label: item.label),
+              ),
+            );
+          }),
+          if (r.artists.length > 6)
+            ActionChip(
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              label: Text(
+                _artistsOpen ? 'tasteCollapse'.tr : 'tasteShowAll'.trParams({'count': '${r.artists.length}'}),
+                style: TextStyle(fontSize: 12.5, color: Theme.of(context).colorScheme.outline),
+              ),
+              onPressed: () => setState(() => _artistsOpen = !_artistsOpen),
             ),
-          );
-        }).toList(),
+        ],
       ),
     );
   }
